@@ -1,0 +1,394 @@
+# Accusharp HRMS Frontend — Handoff
+
+Built: 2026-08-05. Updated: 2026-08-09 (auth/roles/permissions catch-up).
+GreyHR-style React frontend for the Accusharp HRMS Spring Boot backend. This doc
+is for whoever picks this up next — what's here, how it's wired, what's
+deliberately missing, and what to do first.
+
+---
+
+## 1. Quick start
+
+Two servers, no build step needed for dev:
+
+```bash
+# Backend — H2 in-memory, no MySQL needed, seeds demo data + permissions on boot
+cd Accusharp
+./mvnw spring-boot:run -Dspring-boot.run.profiles=h2
+```
+
+```bash
+# Frontend
+cd Accusharpfrontend/accusharp
+npm install   # first time only
+npm start     # http://localhost:3000
+```
+
+CRA's dev server proxies `/api/*` to `http://localhost:8080` via the `"proxy"` key
+in `package.json`. The backend now also has a real CORS filter
+(`SecurityConfig.corsConfigurationSource`, allowing `http://localhost:3000` by
+default via `app.cors.allowed-origins`) — the proxy is what dev uses day to day,
+but a production deploy on a different origin from the API is no longer blocked
+outright the way it used to be; just point `app.cors.allowed-origins` at the real
+frontend origin.
+
+**Login, not "Acting as."** The app now has a real login screen at `/login`. Pick
+one of the seeded accounts (all share the password **`Accusharp@123`**, see
+`Accusharp/SECURITY.md`):
+
+| User ID | Role | Notes |
+|---|---|---|
+| `HR001` | HR | Meera Joshi |
+| `SUP001` | Supervisor | Rakesh Patil, supervises EMP001/EMP002 |
+| `EMP001` | Employee | Sunil Kadam |
+| `EMP002` | Employee | Anita Shinde |
+| `platform_owner` | Platform (`PLATFORM_OWNER`) | Not tied to any company — see §4a |
+
+There is no seeded company `ADMIN` — every seeded employee is HR/SUPERVISOR/
+EMPLOYEE. To get an `ADMIN` account, log in as `platform_owner` and use
+**Onboard Company** (`/platform/onboard`), which creates a new company plus its
+first `ADMIN` employee and returns a one-time temporary password on screen.
+
+Production build: `npm run build` (compiles clean, zero warnings, ~584KB gzipped
+main bundle — no code-splitting done, see §7).
+
+---
+
+## 2. What this is
+
+A full HRMS UI covering all 15 backend modules: org masters, employees, shift
+scheduling, biometric attendance, leave, payroll, salary slips, reports,
+dashboard — plus the backend's full security/authorization layer: JWT login,
+permission-gated navigation, admin password reset, dynamic custom roles, and the
+audit log. Built against the backend's actual controller/DTO source (not just its
+docs), so the API layer in `src/api/*` should match the backend exactly as of
+this date.
+
+**Real authentication, real authorization.** The backend enforces JWT auth and a
+data-driven permission matrix (`PermissionCode` + `PermissionSeeder`) on every
+`/api/**` route — see `Accusharp/SECURITY.md`. The frontend now matches: a login
+screen issues and stores a JWT access/refresh token pair, every request carries
+`Authorization: Bearer <token>`, and nav/page actions are gated by a
+frontend-side mirror of the same role→permission matrix
+(`src/constants/permissions.js`). This is real UX gating on top of a real API
+boundary, not a decoration — a plain `EMPLOYEE` genuinely cannot reach
+`EMPLOYEE_CREATE`-gated endpoints, gated or not, because the backend also refuses
+them.
+
+**Known, accepted gap**: there is no backend endpoint for a principal to
+discover their own *custom-role*-granted permissions (see §4b) — nav gating is
+therefore driven by the static base-role matrix, same as the backend's own fast
+path. An employee who gained an extra capability purely through a custom role
+won't get an extra nav item for it automatically, but the underlying API call
+still works if they reach it by URL. This mirrors a documented limitation in the
+backend itself (`Accusharp/ARCHITECTURE.md`'s "Not implemented" list), not
+something introduced here.
+
+---
+
+## 3. Architecture
+
+```
+src/
+  api/            One thin module per backend controller (companies.js, employees.js,
+                   attendance.js, leaves.js, payroll.js, reports.js, auth.js,
+                   customRoles.js, auditLogs.js, ...). Each function maps 1:1 to an
+                   endpoint. client.js holds the axios instance, attaches the stored
+                   JWT to every request, silently refreshes-and-retries once on a 401,
+                   and a global error interceptor that surfaces backend ApiError.message
+                   via notistack.
+  context/        AuthContext — the real thing: tokens (persisted to localStorage),
+                   principalType/username/role, the logged-in employee's own profile
+                   ("me"), the full employee list (for pickers), login()/logout(),
+                   and can(permissionCode). ActingAsContext is now a *compatibility
+                   shim* over AuthContext (see §4c) — kept so the many pre-existing
+                   pages that only ever read `employees`/role booleans/`actingAs`
+                   didn't need to change.
+  theme/          MUI theme (teal/navy palette, Inter font).
+  layout/         AppLayout (sidebar + topbar shell, now with a real user menu -
+                   change password / logout - instead of the old employee switcher),
+                   navConfig.js (nav items with per-role visibility, plus a separate
+                   platformNavConfig for PLATFORM_OWNER/PLATFORM_ADMIN principals).
+  components/     Shared bits: DataTable (MUI DataGrid wrapper), PageHeader,
+                   ConfirmDialog, StatCard, StatusChip, EmployeePicker /
+                   EmployeeMultiPicker (Autocomplete over the employee list),
+                   MoneyText (INR formatting), MasterCrudPage + MasterFormDialog
+                   (generic list+dialog CRUD, now with a readOnly prop - see §4d),
+                   ProtectedRoute (redirects to /login if not authenticated),
+                   TempPasswordDialog (reveals a one-time temp password from
+                   employee create/reset or company onboarding).
+  pages/          One folder per module, routed from App.js. Multi-tab modules
+                   (Masters, Roster, Attendance, Leave, Payroll) have a *Layout.jsx
+                   that renders MUI Tabs + <Outlet/>. New: Auth/ (Login,
+                   ChangePassword), Roles/ (RolesList, RoleDetail - custom role
+                   permission editor), AuditLog/ (view + CSV export + purge),
+                   Platform/ (OnboardCompany - Companies.jsx is reused for the
+                   platform company list, see §4d).
+  constants/      enums.js — every backend enum (EmployeeStatus, LeaveType, etc.)
+                   with label/color mappings. permissions.js (new) — the
+                   role→PermissionCode grant matrix, hand-transcribed from the
+                   backend's PermissionSeeder.java; both are kept in sync with the
+                   backend by hand.
+  utils/          csv.js — client-side CSV export used by the Reports module.
+                   download.js (new) — generic blob-download helper, used by the
+                   audit log's server-generated CSV export.
+```
+
+**Routing**: React Router v7, all routes declared in `src/App.js`. `/login` is
+public; everything else sits behind `<ProtectedRoute/>` (redirects to `/login` if
+not authenticated) wrapping `<AppLayout/>`. The `/` route renders a small
+`RootRedirect` that sends a platform principal to `/platform/companies` and a
+plain `EMPLOYEE` to `/attendance/me` — neither holds `DASHBOARD_READ`, so neither
+can land on the Dashboard. No lazy loading / code splitting.
+
+**Data fetching**: Plain `useEffect` + local component state throughout. No
+React Query / SWR / global cache. Every page re-fetches on mount. This was a
+reasonable choice given the app's size, but means duplicate fetches across tab
+switches (e.g. `/api/employees` refetches often — visible in the network tab).
+Worth revisiting if the app grows.
+
+---
+
+## 4. What changed in the auth/roles/permissions catch-up (2026-08-09)
+
+The backend landed ten phases of security work on `feature/attendance-to-
+Security-` (JWT auth, permissions, multi-tenant isolation, audit logging,
+admin password reset, dynamic custom roles — full detail in
+`Accusharp/SECURITY.md`) while this frontend still assumed the old
+unauthenticated backend (see the git history of this file / §2 in earlier
+revisions). This section is what closed that gap.
+
+### 4a. Two principal types, one login screen
+
+`POST /api/auth/login` returns `{accessToken, refreshToken, principalType,
+username, role}` for either an `Employee` (`ADMIN/HR/SUPERVISOR/EMPLOYEE`,
+company-scoped) or a `PlatformUser` (`PLATFORM_OWNER/PLATFORM_ADMIN`, no
+company). `AuthContext` treats both uniformly for token storage, but the UI
+branches hard on `principalType`: a platform principal gets its own minimal
+sidebar (`platformNavConfig` — Companies, Onboard Company, Audit Log) instead of
+the full company nav, since it holds none of the company-scoped permissions.
+`pages/Masters/Companies.jsx` is reused at both `/masters/companies` (company
+side, read-only — see §4d) and `/platform/companies` (platform side, full CRUD)
+rather than duplicating the page.
+
+### 4b. Custom roles (Phase 10) get a UI
+
+The backend's `CustomRoleController` (create a named role, grant it permissions,
+assign it to employees) previously had no frontend at all — flagged as a gap in
+`Accusharp/ARCHITECTURE.md`. Now: `/roles` (list + create, ADMIN-only) and
+`/roles/:id` (a permission checklist grouped by resource — Employee, Leave,
+Payroll, etc. — with platform-only codes like `COMPANY_CREATE` and
+`AUDIT_MANAGE` omitted entirely, mirroring `CustomRoleService.setPermissions`'s
+hard guard). Assignment to a specific employee lives on that employee's own
+detail page (`EmployeeDetail.jsx`'s "Custom roles" card) rather than on the role
+page, since the only backend lookup available is *by employee*
+(`GET /api/roles/employees/{userId}`), not *by role* — there's no "which
+employees have this role" endpoint to build a reverse listing from without an
+O(n) fan-out over the whole employee list.
+
+### 4c. `ActingAsContext` is now a compatibility shim, not a real feature
+
+The old "Acting as" employee switcher (client-side only, didn't restrict any API
+call) is gone. `AuthContext` is the real implementation now. Rather than touch
+the ~21 page files that called `useActingAs()` for the employee list and role
+booleans, `context/ActingAsContext.jsx` was rewritten to derive the identical
+shape from `useAuth()` — `actingAs` is now the logged-in user's own record
+instead of a manually-picked one, everything else is unchanged. If you're
+touching one of those pages, know that `useActingAs()` is legacy naming for
+"give me role info + the employee list," not a distinct piece of state.
+
+### 4d. Companies master went from full CRUD to conditionally read-only
+
+`COMPANY_CREATE/UPDATE/DELETE` are platform-only (`PermissionSeeder`) — a
+company `ADMIN`/`HR` only ever held `COMPANY_READ`. The old Masters → Companies
+page didn't know that and would have 403'd on every add/edit/delete for every
+company-side user. `MasterCrudPage` gained a `readOnly` prop (hides the Add
+button and the actions column); `Masters/Companies.jsx` passes
+`readOnly={!isPlatform}`, so the exact same page is full CRUD at
+`/platform/companies` and view-only at `/masters/companies`.
+
+### 4e. One-time temporary passwords
+
+`POST /api/employees` and `POST /api/employees/{id}/reset-password` both return
+`{employee, temporaryPassword}` now (Phase 9) — the password is shown exactly
+once and never recoverable after. `TempPasswordDialog` (new, generic) is the
+single place this is displayed, reused for employee creation, admin-triggered
+password reset (`EmployeeDetail.jsx`, gated behind `EMPLOYEE_UPDATE` — a plain
+`SUPERVISOR` viewing a team member no longer sees an Edit or Reset-password
+button, since they lack that permission and would have 403'd), and company
+onboarding.
+
+### 4f. Token handling
+
+`localStorage` under one `accusharp.auth` key holds the whole `TokenResponse`.
+`api/client.js`'s request interceptor attaches the access token to every call;
+its response interceptor does a silent refresh-and-retry exactly once on a 401
+(a shared in-flight promise so concurrent 401s don't each trigger their own
+refresh call), and clears state + bounces to `/login` if the refresh itself
+fails. `POST /api/auth/change-password` revokes every refresh token for that
+principal server-side, so `ChangePassword.jsx` forces a logout immediately after
+a successful change — there is no "stay logged in" option, by design.
+
+---
+
+## 5. Module → route map
+
+| Module | Routes |
+|---|---|
+| Auth | `/login` (public), `/change-password` |
+| Dashboard | `/` (redirects — see §3 — for `EMPLOYEE` and platform principals) |
+| Masters | `/masters/companies` (read-only for company users), `/departments`, `/designations`, `/salary-rule` |
+| Employees | `/employees`, `/employees/new`, `/employees/:id`, `/employees/:id/edit`, `/team` |
+| Shifts | `/shifts` |
+| Roster | `/roster/planner`, `/bulk`, `/auto-rotate`, `/copy-month`, `/swap` |
+| Holidays | `/holidays` |
+| Attendance | `/attendance/me`, `/attendance/generate`, `/attendance/records` |
+| Leave | `/leave/apply`, `/my`, `/approvals`, `/all`, `/calendar`, `/balances` |
+| Payroll | `/payroll/generate`, `/generate-all`, `/list`, `/history` |
+| Salary Slips | `/salary-slips`, `/salary-slips/me` |
+| Reports | `/reports` (hub) + 13 sub-routes under `/reports/*` |
+| Custom Roles | `/roles` (ADMIN-only), `/roles/:id` |
+| Audit Log | `/audit-logs` (company ADMIN + platform) |
+| Platform | `/platform/companies` (full Companies CRUD), `/platform/onboard` |
+
+---
+
+## 6. What was verified
+
+Everything below was clicked through live against the H2-seeded backend over the
+course of both build sessions, not just compiled.
+
+**This session (auth/roles/permissions)**:
+
+- Logged in as `HR001`, `SUP001`, `EMP002`, and `platform_owner`; confirmed
+  correct landing page per role/principal type, correct nav visibility (the
+  Security section — Custom Roles, Audit Log — is invisible to non-ADMIN;
+  platform gets its own 3-item nav), and logout.
+- Onboarded a new company as `platform_owner`, capturing the returned temp
+  password and logging in as the new `ADMIN` with it.
+- As that `ADMIN`: created a custom role, granted it `REPORT_READ`, confirmed no
+  platform-only codes ever appear in the checklist, assigned the role to an
+  employee from the employee detail page, saw the assignment take effect
+  (`PUT /api/roles/{id}/permissions` → 200, role chip renders).
+- Viewed the Audit Log: rows render scoped to the caller's own company, CSV
+  export request succeeds, no Purge control is visible for a company `ADMIN`
+  (`AUDIT_MANAGE` is platform-only) but is visible for `platform_owner`.
+- Confirmed `Masters → Companies` is read-only (no Add button, no row actions)
+  for a company `ADMIN`.
+- Confirmed a `SUPERVISOR` viewing a direct report's detail page sees neither
+  "Edit" nor "Reset password" (both need `EMPLOYEE_UPDATE`, which `SUPERVISOR`
+  lacks).
+- Changed password end-to-end: old session invalidated, forced back to
+  `/login`, new password logs in successfully.
+- `npm run build` — clean, no warnings, after every change.
+
+Three real bugs were found and fixed during this pass, not just theorized about
+— see §8.
+
+**Prior session (initial build, 2026-08-05)**: created an employee, bulk-
+assigned a shift roster, generated and corrected attendance, ran leave apply →
+supervisor-endorse → HR-approve end to end, generated payroll and read the
+breakdown, viewed a salary slip (including a negative-net-pay edge case),
+spot-checked all 13 report pages.
+
+**Not exercised** (either session): payroll `/regenerate` after a real
+conflict, attendance `/unlock` after a payroll lock, shift auto-rotate/copy-
+month/swap submitted for real, CSV export *file contents* (download triggers
+were confirmed, the files themselves weren't opened), print view rendering
+(confirmed 200 + correct content-type, not screenshotted), and proactive
+access-token expiry (the refresh-on-401 *code path* is exercised implicitly by
+normal use, but a token wasn't deliberately expired to watch the refresh fire).
+
+---
+
+## 7. Known gaps / things to do before real use
+
+1. **Token storage is `localStorage`, not an httpOnly cookie.** Standard
+   tradeoff for a bearer-token SPA with no server-side session — fine for this
+   app's threat model today, but worth knowing if XSS resistance becomes a
+   requirement later.
+2. **No self-discovery of custom-role-granted permissions** — see §2/§4b. Nav
+   only reflects the base-role matrix; someone with an extra permission via a
+   custom role can use it (the API allows it) but won't see a nav item for it.
+3. **Bundle size** (~584KB gzipped) has no code-splitting. Route-based
+   `React.lazy()` would help, especially for the Reports module (13 rarely-all-
+   used pages bundled together).
+4. **No tests.** Zero unit/integration tests were written for the frontend. The
+   backend has its own (`Accusharp/TESTING.md`, `./mvnw test`), but the React app
+   has none — this now includes zero coverage of the auth flow, which is the
+   highest-value thing to add tests for next.
+5. **Duplicate fetching** — see §3. Consider a shared data layer if this grows.
+6. **MUI v9 quirks** — this environment has MUI v9 (newer than what most
+   documentation assumes). Breaking changes bit us during the original build,
+   fixed everywhere they occurred, but worth knowing before adding new code:
+   - `Stack` no longer accepts `alignItems` / `justifyContent` / `flexWrap` as
+     direct props — they must go inside `sx={{ ... }}` or they silently leak
+     onto the DOM node as invalid attributes (React warns in the console).
+   - `Autocomplete`'s `renderTags` prop was renamed to `renderValue`, with a
+     different callback signature (`(value, getItemProps, ownerState)` instead
+     of `(value, getTagProps)`). See `src/components/EmployeeMultiPicker.jsx`
+     for the working pattern.
+   - `ListItemText`'s `primaryTypographyProps` → `slotProps={{ primary: {...} }}`.
+7. **Automated browser clicks on MUI popovers were unreliable** during both
+   build sessions — screenshot-space coordinates didn't map cleanly to the real
+   viewport for `Select`/`Autocomplete` menus opened via synthetic mouse
+   coordinates. Ref-based clicks (from `read_page`) and direct DOM dispatch
+   worked reliably; keep that in mind if scripting further browser-driven QA.
+
+---
+
+## 8. Bugs found and fixed during this build
+
+### Backend (initial session, 2026-08-05)
+
+`GET /api/holidays` threw a 500 (`LazyInitializationException`) as soon as any
+holiday existed, because `Holiday.company` is a lazy `@ManyToOne` and the backend
+runs with `spring.jpa.open-in-view=false` — the Hibernate session was closed
+before Jackson tried to serialize the lazy `company` proxy on the list endpoint.
+
+Fixed in the backend (not the frontend) by adding a `JOIN FETCH` query:
+
+- [`Accusharp/src/main/java/com/accusharp/hrms/repository/HolidayRepository.java`](../../Accusharp/src/main/java/com/accusharp/hrms/repository/HolidayRepository.java) —
+  added `findAllWithCompany()` and made the date-range finder also fetch `company`.
+- [`Accusharp/src/main/java/com/accusharp/hrms/service/HolidayService.java`](../../Accusharp/src/main/java/com/accusharp/hrms/service/HolidayService.java) —
+  `getAll()` now calls `findAllWithCompany()`.
+
+Single-record POST/PUT responses were never affected (the service sets a fully
+loaded `Company`, not a lazy proxy, when creating/updating).
+
+### Frontend (this session, 2026-08-09)
+
+All three were caught by actually driving the app in a browser against the live
+backend, not by reading the code:
+
+- **`EmployeeForm.jsx` create response.** `POST /api/employees` changed shape to
+  `{employee, temporaryPassword}` (Phase 9) but the form still did
+  `navigate(`/employees/${res.id}`)`, which would have silently navigated to
+  `/employees/undefined`. Fixed alongside adding the temp-password reveal.
+- **`Masters/Companies.jsx` full CRUD 403s for company users** — see §4d.
+- **Intermittent blank landing page for a plain `EMPLOYEE` right after login.**
+  `Login.jsx` had both an imperative `navigate()` in its submit handler *and* a
+  declarative `<Navigate>` for the `isAuthenticated` case, which raced against
+  `RootRedirect`'s own `<Navigate>` at `/`. Depending on render timing, the
+  browser could end up on `/` with `RootRedirect` never actually completing its
+  own redirect and the page rendering blank. Fixed by deleting the imperative
+  call entirely — `isAuthenticated` flipping true after `login()` resolves is
+  enough on its own to trigger the declarative branch.
+
+---
+
+## 9. Suggested next steps, roughly in priority order
+
+1. Write smoke-level tests for the auth flow (`AuthContext`, `client.js`'s
+   refresh-on-401 logic) and the API layer (`src/api/*`) — the highest-value
+   untested surface right now, see §7.4.
+2. Decide whether the custom-role self-discovery gap (§2/§4b/§7.2) needs
+   closing — it needs a new backend endpoint, not just a frontend change.
+3. Code-split the Reports module and Payroll/Attendance consoles with
+   `React.lazy()` to bring down initial bundle size.
+4. Revisit data fetching — a shared cache (React Query or similar) would cut
+   the duplicate `/api/employees` calls visible on nearly every navigation.
+5. Consider a forced-password-change flag for temporary passwords (backend
+   doesn't set one yet — see `Accusharp/SECURITY.md`'s onboarding section) so
+   the frontend can route a first-login temp-password user straight to
+   `/change-password` instead of trusting them to do it themselves.

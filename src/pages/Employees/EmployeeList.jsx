@@ -1,0 +1,190 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import PersonOffRoundedIcon from '@mui/icons-material/PersonOffRounded';
+import { useSnackbar } from 'notistack';
+import PageHeader from '../../components/PageHeader';
+import DataTable from '../../components/DataTable';
+import StatusChip from '../../components/StatusChip';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import employeesApi from '../../api/employees';
+import { RECORD_STATUS_COLOR, ROLE_COLOR, labelize } from '../../constants/enums';
+import { useActingAs } from '../../context/ActingAsContext';
+
+export default function EmployeeList() {
+  const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
+  const { reloadEmployees } = useActingAs();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [deptFilter, setDeptFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    employeesApi
+      .list()
+      .then(setRows)
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const departments = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.departmentName).filter(Boolean))),
+    [rows]
+  );
+
+  const filtered = useMemo(
+    () =>
+      rows.filter((r) => {
+        const matchesSearch =
+          !search ||
+          r.employeeName?.toLowerCase().includes(search.toLowerCase()) ||
+          r.userId?.toLowerCase().includes(search.toLowerCase()) ||
+          r.employeeCode?.toLowerCase().includes(search.toLowerCase());
+        const matchesDept = deptFilter === 'ALL' || r.departmentName === deptFilter;
+        const matchesStatus = statusFilter === 'ALL' || r.recordStatus === statusFilter;
+        return matchesSearch && matchesDept && matchesStatus;
+      }),
+    [rows, search, deptFilter, statusFilter]
+  );
+
+  const handleDeactivate = () => {
+    if (!deactivateTarget) return;
+    setBusy(true);
+    employeesApi
+      .deactivate(deactivateTarget.id)
+      .then(() => {
+        enqueueSnackbar('Employee deactivated', { variant: 'success' });
+        setDeactivateTarget(null);
+        reloadEmployees();
+        load();
+      })
+      .catch(() => {})
+      .finally(() => setBusy(false));
+  };
+
+  const columns = [
+    { field: 'employeeCode', headerName: 'Code', width: 110 },
+    { field: 'employeeName', headerName: 'Name', flex: 1, minWidth: 170 },
+    { field: 'userId', headerName: 'User ID', width: 110 },
+    { field: 'departmentName', headerName: 'Department', width: 150 },
+    { field: 'designationName', headerName: 'Designation', width: 160 },
+    { field: 'supervisorName', headerName: 'Supervisor', width: 150 },
+    {
+      field: 'role',
+      headerName: 'Role',
+      width: 120,
+      renderCell: (params) => <StatusChip value={params.value} colorMap={ROLE_COLOR} />,
+    },
+    { field: 'status', headerName: 'Employment', width: 120, valueFormatter: (v) => labelize(v) },
+    {
+      field: 'recordStatus',
+      headerName: 'Status',
+      width: 110,
+      renderCell: (params) => <StatusChip value={params.value} colorMap={RECORD_STATUS_COLOR} />,
+    },
+    {
+      field: 'actions',
+      headerName: '',
+      sortable: false,
+      filterable: false,
+      width: 130,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={0.5}>
+          <Tooltip title="View">
+            <IconButton size="small" onClick={() => navigate(`/employees/${params.row.id}`)}>
+              <VisibilityRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit">
+            <IconButton size="small" onClick={() => navigate(`/employees/${params.row.id}/edit`)}>
+              <EditRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Deactivate">
+            <IconButton size="small" onClick={() => setDeactivateTarget(params.row)}>
+              <PersonOffRoundedIcon fontSize="small" color="error" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        title="Employees"
+        subtitle="Employee master — identity, org placement and salary structure"
+        actions={
+          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate('/employees/new')}>
+            Add Employee
+          </Button>
+        }
+      />
+      <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap' }}>
+        <TextField
+          size="small"
+          label="Search"
+          placeholder="Name, code or user id"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ minWidth: 240 }}
+        />
+        <TextField
+          select
+          size="small"
+          label="Department"
+          value={deptFilter}
+          onChange={(e) => setDeptFilter(e.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="ALL">All departments</MenuItem>
+          {departments.map((d) => (
+            <MenuItem key={d} value={d}>
+              {d}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          size="small"
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          sx={{ minWidth: 150 }}
+        >
+          <MenuItem value="ALL">All</MenuItem>
+          <MenuItem value="ACTIVE">Active</MenuItem>
+          <MenuItem value="INACTIVE">Inactive</MenuItem>
+        </TextField>
+      </Stack>
+      <DataTable rows={filtered} columns={columns} loading={loading} height={600} />
+
+      <ConfirmDialog
+        open={!!deactivateTarget}
+        title="Deactivate employee?"
+        description={`"${deactivateTarget?.employeeName}" will be marked inactive. Payroll history is preserved — this does not delete the record.`}
+        confirmLabel="Deactivate"
+        confirmColor="error"
+        loading={busy}
+        onConfirm={handleDeactivate}
+        onClose={() => setDeactivateTarget(null)}
+      />
+    </>
+  );
+}
