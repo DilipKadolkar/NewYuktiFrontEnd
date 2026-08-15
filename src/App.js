@@ -15,10 +15,12 @@ import EmployeeList from './pages/Employees/EmployeeList';
 import EmployeeForm from './pages/Employees/EmployeeForm';
 import EmployeeDetail from './pages/Employees/EmployeeDetail';
 import MyTeam from './pages/Employees/MyTeam';
+import BulkImportEmployees from './pages/Employees/BulkImportEmployees';
 import ShiftList from './pages/Shifts/ShiftList';
 import RosterLayout from './pages/Roster/RosterLayout';
 import Planner from './pages/Roster/Planner';
 import BulkAssign from './pages/Roster/BulkAssign';
+import BulkImportCsv from './pages/Roster/BulkImportCsv';
 import AutoRotate from './pages/Roster/AutoRotate';
 import CopyMonth from './pages/Roster/CopyMonth';
 import Swap from './pages/Roster/Swap';
@@ -37,6 +39,7 @@ import LeaveBalances from './pages/Leave/Balances';
 import PayrollLayout from './pages/Payroll/PayrollLayout';
 import PayrollGenerate from './pages/Payroll/Generate';
 import PayrollGenerateAll from './pages/Payroll/GenerateAll';
+import PayrollBulkGenerate from './pages/Payroll/BulkGenerate';
 import PayrollList from './pages/Payroll/List';
 import PayrollEmployeeHistory from './pages/Payroll/EmployeeHistory';
 import SalarySlip from './pages/SalarySlips/SalarySlip';
@@ -89,6 +92,7 @@ function App() {
 
           <Route path="/employees" element={<EmployeeList />} />
           <Route path="/employees/new" element={<EmployeeForm />} />
+          <Route path="/employees/bulk-import" element={<BulkImportEmployees />} />
           <Route path="/employees/:id/edit" element={<EmployeeForm />} />
           <Route path="/employees/:id" element={<EmployeeDetail />} />
           <Route path="/team" element={<MyTeam />} />
@@ -99,6 +103,7 @@ function App() {
             <Route index element={<Planner />} />
             <Route path="planner" element={<Planner />} />
             <Route path="bulk" element={<BulkAssign />} />
+            <Route path="csv-upload" element={<BulkImportCsv />} />
             <Route path="auto-rotate" element={<AutoRotate />} />
             <Route path="copy-month" element={<CopyMonth />} />
             <Route path="swap" element={<Swap />} />
@@ -127,6 +132,7 @@ function App() {
             <Route index element={<PayrollGenerate />} />
             <Route path="generate" element={<PayrollGenerate />} />
             <Route path="generate-all" element={<PayrollGenerateAll />} />
+            <Route path="bulk-generate" element={<PayrollBulkGenerate />} />
             <Route path="list" element={<PayrollList />} />
             <Route path="history" element={<PayrollEmployeeHistory />} />
           </Route>

@@ -22,6 +22,16 @@ const shiftSchedules = {
     client
       .delete(`/shift-schedules/${userId}`, { params: { fromDate, toDate } })
       .then((r) => r.data),
+  // CSV roster upload, one row per employee-day-shift - unlike bulkAssign(), each row can
+  // carry its own shift code, so one file can roster a whole team across different shifts
+  // and days. Every row applies independently; returns BulkImportResult<ShiftScheduleResponse>.
+  bulkImportCsv: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/shift-schedules/bulk/csv', formData, { headers: { 'Content-Type': undefined } })
+      .then((r) => r.data);
+  },
 };
 
 export default shiftSchedules;

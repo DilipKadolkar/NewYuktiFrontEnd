@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import PersonOffRoundedIcon from '@mui/icons-material/PersonOffRounded';
@@ -131,9 +132,18 @@ export default function EmployeeList() {
         title="Employees"
         subtitle="Employee master — identity, org placement and salary structure"
         actions={
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate('/employees/new')}>
-            Add Employee
-          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileRoundedIcon />}
+              onClick={() => navigate('/employees/bulk-import')}
+            >
+              Bulk Import
+            </Button>
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate('/employees/new')}>
+              Add Employee
+            </Button>
+          </Stack>
         }
       />
       <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap' }}>

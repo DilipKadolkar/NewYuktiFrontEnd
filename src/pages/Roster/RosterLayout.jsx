@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 const TABS = [
   { label: 'Planner', path: '/roster/planner' },
   { label: 'Bulk Assign', path: '/roster/bulk' },
+  { label: 'CSV Upload', path: '/roster/csv-upload' },
   { label: 'Auto Rotate', path: '/roster/auto-rotate' },
   { label: 'Copy Month', path: '/roster/copy-month' },
   { label: 'Swap', path: '/roster/swap' },

@@ -25,6 +25,17 @@ const employees = {
   // Same regeneration for every non-overridden employee in the company; returns { regenerated: n }.
   regenerateAllSalaryStructures: () =>
     client.post('/employees/salary-structure/regenerate-all').then((r) => r.data),
+  // CSV bulk onboarding, one row per employee - same create() path per row, so a bad
+  // row never blocks the rest of the file. Returns BulkImportResult<{employee, temporaryPassword}>.
+  // 'Content-Type': undefined lets the browser set multipart/form-data with its boundary -
+  // client.js's default 'application/json' header would otherwise make axios JSON-encode the FormData.
+  bulkImport: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/employees/bulk-import', formData, { headers: { 'Content-Type': undefined } })
+      .then((r) => r.data);
+  },
 };
 
 export default employees;

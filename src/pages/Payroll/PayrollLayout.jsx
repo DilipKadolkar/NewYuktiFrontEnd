@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 const TABS = [
   { label: 'Generate', path: '/payroll/generate' },
   { label: 'Generate All', path: '/payroll/generate-all' },
+  { label: 'Bulk Generate (CSV)', path: '/payroll/bulk-generate' },
   { label: 'List', path: '/payroll/list' },
   { label: 'Employee History', path: '/payroll/history' },
 ];
@@ -13,7 +14,11 @@ const TABS = [
 export default function PayrollLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const current = TABS.find((t) => location.pathname.startsWith(t.path))?.path || TABS[0].path;
+  // Longest matching prefix wins, not first-in-array - '/payroll/generate-all' would
+  // otherwise match '/payroll/generate' first and highlight the wrong tab.
+  const current =
+    TABS.filter((t) => location.pathname.startsWith(t.path)).sort((a, b) => b.path.length - a.path.length)[0]
+      ?.path || TABS[0].path;
 
   return (
     <Box>
