@@ -45,6 +45,13 @@ const emptyForm = {
   medicalAllowance: '',
   otherAllowance: '',
   overtimeEligible: false,
+  // Create-time-only escape hatch: skip rule-derivation and pin these four directly
+  // (e.g. migrating from an existing payroll system that already has exact figures).
+  structureOverride: false,
+  basicDA: '',
+  hra: '',
+  conveyanceAllowance: '',
+  educationAllowance: '',
 };
 
 export default function EmployeeForm() {
@@ -120,7 +127,9 @@ export default function EmployeeForm() {
       form.grossSalary !== '' &&
       form.pfBasic !== '' &&
       form.medicalAllowance !== '' &&
-      form.otherAllowance !== '',
+      form.otherAllowance !== '' &&
+      (!form.structureOverride ||
+        (form.basicDA !== '' && form.hra !== '' && form.conveyanceAllowance !== '' && form.educationAllowance !== '')),
     [form]
   );
 
@@ -146,6 +155,16 @@ export default function EmployeeForm() {
       medicalAllowance: form.medicalAllowance,
       otherAllowance: form.otherAllowance,
       overtimeEligible: form.overtimeEligible,
+      // Omitted entirely (not sent as null/empty) when the toggle is off, so the server
+      // still derives the structure from the salary rule exactly as before this existed.
+      ...(!isEdit && form.structureOverride
+        ? {
+            basicDA: form.basicDA,
+            hra: form.hra,
+            conveyanceAllowance: form.conveyanceAllowance,
+            educationAllowance: form.educationAllowance,
+          }
+        : {}),
     };
     if (isEdit) {
       employeesApi
@@ -392,8 +411,22 @@ export default function EmployeeForm() {
         <CardHeader title={<Typography variant="subtitle1">Salary inputs</Typography>} />
         <CardContent sx={{ pt: 0 }}>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Basic+DA, HRA, Conveyance, Education and Gross Wage are derived by the server from the
-            current salary rule — they cannot be entered directly.
+            {isEdit ? (
+              <>
+                Basic+DA, HRA, Conveyance, Education and Gross Wage are derived by the server from
+                the current salary rule — they cannot be entered directly here. Use the salary
+                structure &quot;Override&quot; action on the employee&apos;s detail page to pin them
+                by hand, or &quot;Revise salary&quot; to change gross salary with a recorded reason.
+              </>
+            ) : (
+              <>
+                Basic+DA, HRA, Conveyance, Education and Gross Wage are normally derived by the
+                server from the current salary rule. If this employee&apos;s exact breakup is
+                already known — migrating from an existing payroll system, say — turn on
+                &quot;I already know the exact structure&quot; below to enter all four directly
+                instead of having them recalculated.
+              </>
+            )}
           </Alert>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 3 }}>
@@ -447,6 +480,64 @@ export default function EmployeeForm() {
                 label="Overtime eligible"
               />
             </Grid>
+
+            {!isEdit && (
+              <Grid size={{ xs: 12 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.structureOverride}
+                      onChange={(e) => set('structureOverride', e.target.checked)}
+                    />
+                  }
+                  label="I already know the exact salary structure"
+                />
+              </Grid>
+            )}
+            {!isEdit && form.structureOverride && (
+              <>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Basic + DA"
+                    required
+                    value={form.basicDA}
+                    onChange={(e) => set('basicDA', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="HRA"
+                    required
+                    value={form.hra}
+                    onChange={(e) => set('hra', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Conveyance"
+                    required
+                    value={form.conveyanceAllowance}
+                    onChange={(e) => set('conveyanceAllowance', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Education"
+                    required
+                    value={form.educationAllowance}
+                    onChange={(e) => set('educationAllowance', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+              </>
+            )}
           </Grid>
         </CardContent>
       </Card>

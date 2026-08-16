@@ -25,6 +25,14 @@ const employees = {
   // Same regeneration for every non-overridden employee in the company; returns { regenerated: n }.
   regenerateAllSalaryStructures: () =>
     client.post('/employees/salary-structure/regenerate-all').then((r) => r.data),
+  // Hike/promotion/correction: updates grossSalary and re-derives basicDA/hra/conveyanceAllowance/
+  // educationAllowance from the current SalaryRule - unless the employee is overridden, in which
+  // case the payload must also carry those four replacement values (a frozen structure never
+  // follows grossSalary on its own). Always logs a SalaryRevision row, unlike a plain update().
+  reviseSalary: (id, payload) =>
+    client.post(`/employees/${id}/salary-revision`, payload).then((r) => r.data),
+  // Full history for one employee, newest effectiveDate first.
+  getSalaryRevisions: (id) => client.get(`/employees/${id}/salary-revisions`).then((r) => r.data),
   // CSV bulk onboarding, one row per employee - same create() path per row, so a bad
   // row never blocks the rest of the file. Returns BulkImportResult<{employee, temporaryPassword}>.
   // 'Content-Type': undefined lets the browser set multipart/form-data with its boundary -

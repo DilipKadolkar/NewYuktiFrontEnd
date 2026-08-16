@@ -18,16 +18,25 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import DialogContentText from '@mui/material/DialogContentText';
 import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import TextField from '@mui/material/TextField';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import LockResetRoundedIcon from '@mui/icons-material/LockResetRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
+import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
 import StatusChip from '../../components/StatusChip';
@@ -37,7 +46,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import TempPasswordDialog from '../../components/TempPasswordDialog';
 import employeesApi from '../../api/employees';
 import customRolesApi from '../../api/customRoles';
-import { RECORD_STATUS_COLOR, ROLE_COLOR, labelize } from '../../constants/enums';
+import { RECORD_STATUS_COLOR, ROLE_COLOR, SALARY_REVISION_REASON, labelize } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -75,6 +84,11 @@ export default function EmployeeDetail() {
   const [savingStructure, setSavingStructure] = useState(false);
   const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [reviseOpen, setReviseOpen] = useState(false);
+  const [reviseValues, setReviseValues] = useState(null);
+  const [revising, setRevising] = useState(false);
+  const [revisions, setRevisions] = useState([]);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [customRoles, setCustomRoles] = useState([]);
   const [allRoles, setAllRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(false);
@@ -96,6 +110,17 @@ export default function EmployeeDetail() {
   };
 
   useEffect(load, [id]);
+
+  const loadRevisions = () => {
+    setRevisionsLoading(true);
+    employeesApi
+      .getSalaryRevisions(id)
+      .then(setRevisions)
+      .catch(() => setRevisions([]))
+      .finally(() => setRevisionsLoading(false));
+  };
+
+  useEffect(loadRevisions, [id]);
 
   const loadCustomRoles = (userId) => {
     if (!canReadRoles || !userId) return;
@@ -178,6 +203,67 @@ export default function EmployeeDetail() {
       })
       .catch(() => {})
       .finally(() => setRegenerating(false));
+  };
+
+  const openReviseDialog = () => {
+    setReviseValues({
+      newGrossSalary: '',
+      effectiveDate: dayjs(),
+      reason: 'ANNUAL_INCREMENT',
+      remarks: '',
+      // Only required by the server when the employee is currently overridden - a frozen
+      // structure never follows grossSalary on its own, so these must be supplied together.
+      basicDA: '',
+      hra: '',
+      conveyanceAllowance: '',
+      educationAllowance: '',
+    });
+    setReviseOpen(true);
+  };
+
+  const setReviseField = (name, value) => setReviseValues((prev) => ({ ...prev, [name]: value }));
+
+  const setReviseMoneyField = (name, value) =>
+    setReviseValues((prev) => ({ ...prev, [name]: value.replace(/[^0-9.]/g, '') }));
+
+  const reviseRequiresStructure = emp?.salaryStructureOverridden;
+  const reviseOk =
+    reviseValues &&
+    reviseValues.newGrossSalary !== '' &&
+    !!reviseValues.effectiveDate &&
+    !!reviseValues.reason &&
+    (!reviseRequiresStructure ||
+      (reviseValues.basicDA !== '' &&
+        reviseValues.hra !== '' &&
+        reviseValues.conveyanceAllowance !== '' &&
+        reviseValues.educationAllowance !== ''));
+
+  const handleReviseSalary = () => {
+    setRevising(true);
+    const payload = {
+      newGrossSalary: reviseValues.newGrossSalary,
+      effectiveDate: reviseValues.effectiveDate.format('YYYY-MM-DD'),
+      reason: reviseValues.reason,
+      remarks: reviseValues.remarks || null,
+      ...(reviseRequiresStructure
+        ? {
+            basicDA: reviseValues.basicDA,
+            hra: reviseValues.hra,
+            conveyanceAllowance: reviseValues.conveyanceAllowance,
+            educationAllowance: reviseValues.educationAllowance,
+          }
+        : {}),
+    };
+    employeesApi
+      .reviseSalary(emp.id, payload)
+      .then(() => {
+        enqueueSnackbar('Salary revision recorded', { variant: 'success' });
+        setReviseOpen(false);
+        load();
+        loadRevisions();
+      })
+      .catch(() => {})
+      .finally(() => setRevising(false));
   };
 
   const handleAssignRole = () => {
@@ -292,6 +378,11 @@ export default function EmployeeDetail() {
                     size="small"
                   />
                   {canUpdate && (
+                    <Button size="small" startIcon={<TrendingUpRoundedIcon />} onClick={openReviseDialog}>
+                      Revise salary
+                    </Button>
+                  )}
+                  {canUpdate && (
                     <Button size="small" startIcon={<EditRoundedIcon />} onClick={openStructureDialog}>
                       Override
                     </Button>
@@ -322,6 +413,52 @@ export default function EmployeeDetail() {
                 <Field label="Other allowance" value={<MoneyText value={emp.otherAllowance} />} />
                 <Field label="PF basic" value={<MoneyText value={emp.pfBasic} />} />
               </Grid>
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mt: 2.5 }}>
+            <CardHeader title={<Typography variant="subtitle1">Salary revision history</Typography>} />
+            <CardContent sx={{ pt: 0 }}>
+              {revisionsLoading ? (
+                <Skeleton variant="rounded" height={80} />
+              ) : revisions.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No hikes, promotions or corrections recorded yet — use &quot;Revise salary&quot;
+                  above instead of a plain edit so a change like this is never lost.
+                </Typography>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Effective</TableCell>
+                      <TableCell>Reason</TableCell>
+                      <TableCell align="right">Previous</TableCell>
+                      <TableCell align="right">New</TableCell>
+                      <TableCell align="right">Hike</TableCell>
+                      <TableCell>By</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {revisions.map((rev, i) => (
+                      <TableRow key={rev.id ?? i}>
+                        <TableCell>{dayjs(rev.effectiveDate).format('DD MMM YYYY')}</TableCell>
+                        <TableCell>{labelize(rev.reason)}</TableCell>
+                        <TableCell align="right">
+                          <MoneyText value={rev.previousGrossSalary} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <MoneyText value={rev.newGrossSalary} />
+                        </TableCell>
+                        <TableCell align="right">
+                          {rev.hikePercent > 0 ? '+' : ''}
+                          {rev.hikePercent}%
+                        </TableCell>
+                        <TableCell>{rev.revisedBy || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -484,6 +621,125 @@ export default function EmployeeDetail() {
         onConfirm={handleRegenerateStructure}
         onClose={() => setRegenerateConfirmOpen(false)}
       />
+
+      <Dialog open={reviseOpen} onClose={() => setReviseOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Revise salary</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Updates {emp.employeeName}&apos;s gross salary and records why — unlike a plain edit,
+            this is never lost. The structure is re-derived from the current salary rule
+            automatically{emp.salaryStructureOverridden ? ', except here, where it is overridden:' : '.'}
+          </DialogContentText>
+          {reviseValues && (
+            <Grid container spacing={2}>
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="New gross salary"
+                  required
+                  value={reviseValues.newGrossSalary}
+                  onChange={(e) => setReviseMoneyField('newGrossSalary', e.target.value)}
+                />
+              </Grid>
+              <Grid size={6}>
+                <DatePicker
+                  label="Effective date"
+                  value={reviseValues.effectiveDate}
+                  onChange={(v) => setReviseField('effectiveDate', v)}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, required: true } }}
+                />
+              </Grid>
+              <Grid size={6}>
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Reason"
+                  required
+                  value={reviseValues.reason}
+                  onChange={(e) => setReviseField('reason', e.target.value)}
+                >
+                  {SALARY_REVISION_REASON.map((r) => (
+                    <MenuItem key={r} value={r}>
+                      {labelize(r)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  multiline
+                  minRows={2}
+                  label="Remarks (optional)"
+                  value={reviseValues.remarks}
+                  onChange={(e) => setReviseField('remarks', e.target.value)}
+                />
+              </Grid>
+              {reviseRequiresStructure && (
+                <>
+                  <Grid size={12}>
+                    <Alert severity="warning">
+                      This employee&apos;s structure is manually overridden, so it will not follow
+                      the new gross salary on its own — enter the replacement figures below.
+                    </Alert>
+                  </Grid>
+                  <Grid size={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Basic + DA"
+                      required
+                      value={reviseValues.basicDA}
+                      onChange={(e) => setReviseMoneyField('basicDA', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="HRA"
+                      required
+                      value={reviseValues.hra}
+                      onChange={(e) => setReviseMoneyField('hra', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Conveyance"
+                      required
+                      value={reviseValues.conveyanceAllowance}
+                      onChange={(e) => setReviseMoneyField('conveyanceAllowance', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Education"
+                      required
+                      value={reviseValues.educationAllowance}
+                      onChange={(e) => setReviseMoneyField('educationAllowance', e.target.value)}
+                    />
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button color="inherit" onClick={() => setReviseOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={handleReviseSalary} disabled={!reviseOk || revising}>
+            Save revision
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

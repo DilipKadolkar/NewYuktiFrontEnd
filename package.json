@@ -16,6 +16,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.19.0",
     "dayjs": "^1.11.21",
+    "exceljs": "^4.4.0",
     "notistack": "^3.0.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

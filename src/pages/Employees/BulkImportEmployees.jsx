@@ -16,21 +16,8 @@ import CsvFileField from '../../components/CsvFileField';
 import BulkImportSummary from '../../components/BulkImportSummary';
 import employeesApi from '../../api/employees';
 import { downloadCsv } from '../../utils/csv';
+import { downloadEmployeeTemplate, EMPLOYEE_TEMPLATE_COLUMNS as TEMPLATE_COLUMNS } from '../../utils/employeeTemplate';
 import { useActingAs } from '../../context/ActingAsContext';
-
-// Mirrors EmployeeCsvParser.java's expected header exactly.
-const TEMPLATE_COLUMNS = [
-  'userId', 'employeeCode', 'employeeName', 'companyId', 'departmentId', 'designationId',
-  'supervisorUserId', 'joiningDate', 'dateOfBirth', 'status', 'role', 'email', 'phone',
-  'grossSalary', 'pfBasic', 'medicalAllowance', 'otherAllowance', 'overtimeEligible',
-];
-const TEMPLATE_EXAMPLE = {
-  userId: 'EMP010', employeeCode: 'AC010', employeeName: 'Jane Doe', companyId: '',
-  departmentId: '1', designationId: '1', supervisorUserId: 'SUP001', joiningDate: '2026-09-01',
-  dateOfBirth: '1995-04-12', status: 'PERMANENT', role: 'EMPLOYEE', email: 'jane.doe@example.com',
-  phone: '9876543210', grossSalary: '30000', pfBasic: '15000', medicalAllowance: '1250',
-  otherAllowance: '1250', overtimeEligible: 'false',
-};
 
 const SUCCEEDED_COLUMNS = [
   { field: 'employeeCode', headerName: 'Code', width: 110, valueGetter: (v, row) => row.employee.employeeCode },
@@ -76,10 +63,8 @@ export default function BulkImportEmployees() {
   const [result, setResult] = useState(null);
 
   const handleTemplate = () => {
-    downloadCsv(
-      'employee-bulk-import-template.csv',
-      TEMPLATE_COLUMNS.map((field) => ({ field })),
-      [TEMPLATE_EXAMPLE]
+    downloadEmployeeTemplate().catch(() =>
+      enqueueSnackbar('Could not generate the template file', { variant: 'error' })
     );
   };
 
@@ -133,11 +118,22 @@ export default function BulkImportEmployees() {
         <CardContent>
           <Stack spacing={2}>
             <Alert severity="info">
-              Expected header (case-insensitive, any order): <code>{TEMPLATE_COLUMNS.join(', ')}</code>. Required:{' '}
-              <code>userId</code>, <code>employeeCode</code>, <code>employeeName</code>, <code>status</code>,{' '}
-              <code>grossSalary</code>, <code>pfBasic</code>, <code>medicalAllowance</code> and{' '}
-              <code>otherAllowance</code> — everything else is optional. <code>companyId</code> is ignored unless
-              you're a platform-level import; it's always overwritten with your own company otherwise.
+              Download the template below — required columns are marked in red. Fill it in, then use{' '}
+              <strong>File → Save As → CSV (Comma delimited)</strong> before uploading, since the upload only
+              accepts <code>.csv</code> files. Expected header (case-insensitive, any order):{' '}
+              <code>{TEMPLATE_COLUMNS.join(', ')}</code>. Required: <code>userId</code>, <code>employeeCode</code>,{' '}
+              <code>employeeName</code>, <code>status</code>, <code>grossSalary</code>, <code>pfBasic</code>,{' '}
+              <code>medicalAllowance</code> and <code>otherAllowance</code> — everything else is optional.{' '}
+              <code>companyId</code> is ignored unless you're a platform-level import; it's always overwritten
+              with your own company otherwise.
+            </Alert>
+            <Alert severity="info">
+              The last four columns (<code>basicDA</code>, <code>hra</code>,{' '}
+              <code>conveyanceAllowance</code>, <code>educationAllowance</code>) are optional, and only
+              make sense filled in together. Leave all four blank on a row to keep deriving that
+              employee's structure from the salary rule, as before — fill in all four to use those
+              exact figures instead (e.g. migrating known values from an existing payroll system).
+              Filling in only some of the four fails that row.
             </Alert>
             <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
               <CsvFileField value={file} onChange={setFile} />
@@ -147,7 +143,7 @@ export default function BulkImportEmployees() {
                 onClick={handleTemplate}
                 sx={{ ml: { sm: 'auto' } }}
               >
-                Download template
+                Download template (.xlsx)
               </Button>
             </Stack>
             <Button variant="contained" onClick={handleUpload} disabled={!file || uploading} sx={{ alignSelf: 'flex-start' }}>
