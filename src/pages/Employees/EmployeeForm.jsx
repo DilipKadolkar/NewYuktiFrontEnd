@@ -18,11 +18,12 @@ import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
 import EmployeePicker from '../../components/EmployeePicker';
 import TempPasswordDialog from '../../components/TempPasswordDialog';
-import { EMPLOYEE_STATUS, ROLE, RECORD_STATUS, labelize } from '../../constants/enums';
+import { EMPLOYEE_STATUS, ROLE, RECORD_STATUS, GENDER, labelize } from '../../constants/enums';
 import employeesApi from '../../api/employees';
 import companiesApi from '../../api/companies';
 import departmentsApi from '../../api/departments';
 import designationsApi from '../../api/designations';
+import categoriesApi from '../../api/categories';
 import { useActingAs } from '../../context/ActingAsContext';
 
 const emptyForm = {
@@ -32,14 +33,20 @@ const emptyForm = {
   companyId: '',
   departmentId: '',
   designationId: '',
+  categoryId: '',
   supervisorUserId: null,
   joiningDate: null,
   dateOfBirth: null,
+  gender: '',
   status: 'PERMANENT',
   recordStatus: 'ACTIVE',
   role: 'EMPLOYEE',
   email: '',
   phone: '',
+  uanNo: '',
+  esicIpNo: '',
+  bankAccountNo: '',
+  bankIfscNo: '',
   grossSalary: '',
   pfBasic: '',
   medicalAllowance: '',
@@ -65,18 +72,23 @@ export default function EmployeeForm() {
   const [companies, setCompanies] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [tempPassword, setTempPassword] = useState(null);
 
   useEffect(() => {
-    Promise.all([companiesApi.list(), departmentsApi.list(), designationsApi.list()]).then(
-      ([c, d, des]) => {
-        setCompanies(c);
-        setDepartments(d);
-        setDesignations(des);
-      }
-    );
+    Promise.all([
+      companiesApi.list(),
+      departmentsApi.list(),
+      designationsApi.list(),
+      categoriesApi.list(),
+    ]).then(([c, d, des, cat]) => {
+      setCompanies(c);
+      setDepartments(d);
+      setDesignations(des);
+      setCategories(cat);
+    });
   }, []);
 
   useEffect(() => {
@@ -86,6 +98,7 @@ export default function EmployeeForm() {
       const company = companies.find((c) => c.companyName === emp.companyName);
       const department = departments.find((d) => d.departmentName === emp.departmentName);
       const designation = designations.find((d) => d.designationName === emp.designationName);
+      const category = categories.find((c) => c.categoryName === emp.categoryName);
       setForm({
         userId: emp.userId,
         employeeCode: emp.employeeCode,
@@ -93,14 +106,20 @@ export default function EmployeeForm() {
         companyId: company?.id ?? '',
         departmentId: department?.id ?? '',
         designationId: designation?.id ?? '',
+        categoryId: category?.id ?? '',
         supervisorUserId: emp.supervisorUserId,
         joiningDate: emp.joiningDate ? dayjs(emp.joiningDate) : null,
         dateOfBirth: emp.dateOfBirth ? dayjs(emp.dateOfBirth) : null,
+        gender: emp.gender || '',
         status: emp.status,
         recordStatus: emp.recordStatus,
         role: emp.role,
         email: emp.email || '',
         phone: emp.phone || '',
+        uanNo: emp.uanNo || '',
+        esicIpNo: emp.esicIpNo || '',
+        bankAccountNo: emp.bankAccountNo || '',
+        bankIfscNo: emp.bankIfscNo || '',
         grossSalary: emp.grossSalary ?? '',
         pfBasic: emp.pfBasic ?? '',
         medicalAllowance: emp.medicalAllowance ?? '',
@@ -110,7 +129,7 @@ export default function EmployeeForm() {
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, id, companies, departments, designations]);
+  }, [isEdit, id, companies, departments, designations, categories]);
 
   const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
@@ -142,14 +161,20 @@ export default function EmployeeForm() {
       companyId: Number(form.companyId),
       departmentId: Number(form.departmentId),
       designationId: Number(form.designationId),
+      categoryId: form.categoryId ? Number(form.categoryId) : null,
       supervisorUserId: form.supervisorUserId || null,
       joiningDate: form.joiningDate ? form.joiningDate.format('YYYY-MM-DD') : null,
       dateOfBirth: form.dateOfBirth ? form.dateOfBirth.format('YYYY-MM-DD') : null,
+      gender: form.gender || null,
       status: form.status,
       recordStatus: form.recordStatus,
       role: form.role,
       email: form.email || null,
       phone: form.phone || null,
+      uanNo: form.uanNo || null,
+      esicIpNo: form.esicIpNo || null,
+      bankAccountNo: form.bankAccountNo || null,
+      bankIfscNo: form.bankIfscNo || null,
       grossSalary: form.grossSalary,
       pfBasic: form.pfBasic,
       medicalAllowance: form.medicalAllowance,
@@ -265,7 +290,25 @@ export default function EmployeeForm() {
                 slotProps={{ textField: { size: 'small', fullWidth: true } }}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 4 }} />
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Gender"
+                value={form.gender}
+                onChange={(e) => set('gender', e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Not specified</em>
+                </MenuItem>
+                {GENDER.map((g) => (
+                  <MenuItem key={g} value={g}>
+                    {labelize(g)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 fullWidth
@@ -345,6 +388,25 @@ export default function EmployeeForm() {
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Category"
+                value={form.categoryId}
+                onChange={(e) => set('categoryId', e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {categories.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.categoryName}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <EmployeePicker
                 label="Supervisor"
                 value={form.supervisorUserId}
@@ -402,6 +464,50 @@ export default function EmployeeForm() {
                   </MenuItem>
                 ))}
               </TextField>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 2.5 }}>
+        <CardHeader title={<Typography variant="subtitle1">Statutory & bank details</Typography>} />
+        <CardContent sx={{ pt: 0 }}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="UAN No"
+                value={form.uanNo}
+                onChange={(e) => set('uanNo', e.target.value)}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="ESIC IP No"
+                value={form.esicIpNo}
+                onChange={(e) => set('esicIpNo', e.target.value)}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Bank Account No"
+                value={form.bankAccountNo}
+                onChange={(e) => set('bankAccountNo', e.target.value)}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Bank IFSC No"
+                value={form.bankIfscNo}
+                onChange={(e) => set('bankIfscNo', e.target.value.toUpperCase())}
+              />
             </Grid>
           </Grid>
         </CardContent>

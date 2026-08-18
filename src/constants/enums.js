@@ -1,5 +1,7 @@
 export const EMPLOYEE_STATUS = ['PERMANENT', 'DAY_WISE', 'CONTRACT', 'INTERN'];
 
+export const GENDER = ['MALE', 'FEMALE'];
+
 export const ROLE = ['ADMIN', 'HR', 'SUPERVISOR', 'EMPLOYEE'];
 
 export const RECORD_STATUS = ['ACTIVE', 'INACTIVE'];

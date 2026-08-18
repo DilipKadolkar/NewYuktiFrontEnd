@@ -344,11 +344,13 @@ export default function EmployeeDetail() {
                 <Field label="Company" value={emp.companyName} />
                 <Field label="Department" value={emp.departmentName} />
                 <Field label="Designation" value={emp.designationName} />
+                <Field label="Category" value={emp.categoryName} />
                 <Field
                   label="Supervisor"
                   value={emp.supervisorName ? `${emp.supervisorName} (${emp.supervisorUserId})` : 'None'}
                 />
                 <Field label="Employment status" value={labelize(emp.status)} />
+                <Field label="Gender" value={emp.gender ? labelize(emp.gender) : '-'} />
                 <Field
                   label="Joining date"
                   value={emp.joiningDate ? dayjs(emp.joiningDate).format('DD MMM YYYY') : '-'}
@@ -364,6 +366,18 @@ export default function EmployeeDetail() {
               <Button size="small" onClick={() => setReassignOpen(true)}>
                 Reassign supervisor
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mb: 2.5 }}>
+            <CardHeader title={<Typography variant="subtitle1">Statutory & bank details</Typography>} />
+            <CardContent sx={{ pt: 0 }}>
+              <Grid container spacing={2}>
+                <Field label="UAN No" value={emp.uanNo} />
+                <Field label="ESIC IP No" value={emp.esicIpNo} />
+                <Field label="Bank Account No" value={emp.bankAccountNo} />
+                <Field label="Bank IFSC No" value={emp.bankIfscNo} />
+              </Grid>
             </CardContent>
           </Card>
 

@@ -2,7 +2,8 @@
 
 Built: 2026-08-05. Updated: 2026-08-09 (auth/roles/permissions catch-up),
 2026-08-16 (bulk employee onboarding: structure override, salary revision,
-credentials export — see §10).
+credentials export — see §10), 2026-08-17 (employee Category master + Gender/
+UAN/ESIC/bank fields, Employee Master report full CSV export — see §14).
 GreyHR-style React frontend for the Accusharp HRMS Spring Boot backend. This doc
 is for whoever picks this up next — what's here, how it's wired, what's
 deliberately missing, and what to do first.
@@ -60,7 +61,12 @@ now — log in as `platform_owner` and use **Onboard Company**
 employee and returns a one-time temporary password on screen. That new
 company starts with zero departments/designations too — create at least one
 of each (`Masters`) before `Add Employee` will let you submit, since both are
-required fields with nothing to select otherwise.
+required fields with nothing to select otherwise. **Categories are the
+exception** (as of 2026-08-17, §14): `DataSeeder.seedCategories()` runs
+unconditionally on every boot, not gated behind the commented-out
+`seedOrganisation()` block, so a fresh company already has five shared
+categories (`WORKER`/`STAFF`/`SUPERVISOR`/`MANAGER`/`DIRECTOR`) to pick from —
+and `categoryId` is optional on an employee besides, so it's never a blocker.
 
 Production build: `npm run build` (compiles clean, zero warnings, ~584KB gzipped
 main bundle — no code-splitting done, see §7).
@@ -252,13 +258,13 @@ a successful change — there is no "stay logged in" option, by design.
 |---|---|
 | Auth | `/login` (public), `/change-password` |
 | Dashboard | `/` (redirects — see §3 — for `EMPLOYEE` and platform principals) |
-| Masters | `/masters/companies` (read-only for company users), `/departments`, `/designations`, `/salary-rule` |
+| Masters | `/masters/companies` (read-only for company users), `/departments`, `/designations`, `/categories`, `/salary-rule`, `/attendance-rule` |
 | Employees | `/employees`, `/employees/new`, `/employees/:id`, `/employees/:id/edit`, `/team` |
 | Shifts | `/shifts` |
 | Roster | `/roster/planner`, `/bulk`, `/auto-rotate`, `/copy-month`, `/swap` |
 | Holidays | `/holidays` |
 | Attendance | `/attendance/me`, `/attendance/generate`, `/attendance/records` |
-| Leave | `/leave/apply`, `/my`, `/approvals`, `/all`, `/calendar`, `/balances` |
+| Leave | `/leave/apply`, `/my`, `/approvals`, `/all`, `/calendar`, `/balances`, `/leave/bulk-import` |
 | Payroll | `/payroll/generate`, `/generate-all`, `/list`, `/history` |
 | Salary Slips | `/salary-slips`, `/salary-slips/me` |
 | Reports | `/reports` (hub) + 13 sub-routes under `/reports/*` |
@@ -589,3 +595,263 @@ standalone through `exceljs` and reading the output back (correct fonts,
 fills, merges, and dropdown validations). **Not done:** logging into the
 running app and clicking the button for real — see §10d, the same
 seeded-org gap blocked it here too.
+
+---
+
+## 12. Attendance rule: the same per-company config `SalaryRule` has, for attendance (2026-08-16)
+
+The app exists to let each customer customize their own attendance
+handling, but `AttendanceCalculationService` had three constants
+(`entryWindowBufferMinutes`, `fullDayThresholdPercent`,
+`halfDayThresholdPercent`) hardcoded identically for every company - the only
+attendance-calculation values that weren't already per-company. `Shift`
+(grace period, break minutes, overtime window, timings) and `Holiday` were
+already company-scoped with a global-default fallback; `SalaryRule` has the
+same shape for payroll. This section gives attendance the same treatment.
+
+### 12a. Backend: new `AttendanceRule`, mirroring `SalaryRule` exactly
+
+New entity/repository/service/controller in `Accusharp/src/main/java/com/accusharp/hrms/`
+(`entity/AttendanceRule.java`, `repository/AttendanceRuleRepository.java`,
+`service/AttendanceRuleService.java`, `controller/AttendanceRuleController.java`,
+`dto/AttendanceRuleRequest.java`) - one row per company plus a
+`company IS NULL` global default, resolved through `TenantContext` exactly
+like `SalaryRuleService`. New permissions `ATTENDANCE_RULE_READ`/`_MANAGE`,
+granted to HR/ADMIN only (same tier as `SALARY_RULE_*`).
+
+`AttendanceCalculationService.calculateDay`/`windowStart` now take an
+`AttendanceRule` parameter instead of reading `private static final`
+constants; `AttendanceService` resolves the caller's (or the target
+employee's) company's rule once per call and threads it through
+`windowed`/`computeFromPunches`/`correctDay`. `halfDayThresholdPercent` must
+be less than `fullDayThresholdPercent` - validated server-side, same
+cross-field-validation shape as other business rules in this app (a plain
+`BusinessRuleException`, not a bean-validation annotation, since it compares
+two fields against each other).
+
+Introducing a fourth company-FK'd table broke every other HTTP test's
+`companyRepository.deleteAll()` cleanup the same way `SalaryRule` originally
+would have - any earlier test class's leftover per-company `AttendanceRule`
+row blocks deleting the company it points at. Fixed by adding
+`attendanceRuleRepository.deleteAll()` alongside each existing
+`salaryRuleRepository.deleteAll()` call (`SelfServiceScopingHttpTest`,
+`CustomRoleHttpTest`, `EmployeeSalaryRevisionHttpTest`,
+`CompanyOnboardingHttpTest`, `EmployeeSalaryStructureHttpTest`,
+`TenantIsolationHttpTest`) - `CompanyOnboardingHttpTest`'s own Javadoc
+already documents exactly why this class of fix is needed (shared H2
+instance across test classes in one Maven run).
+
+New `AttendanceRuleHttpTest` (backend) proves per-company isolation (mirrors
+`EmployeeSalaryStructureHttpTest`'s pattern for `SalaryRule`) and, more
+importantly, that the rule actually changes what `POST /api/attendance/generate`
+computes: the same two punches land as `ABSENT` under the default 40%
+half-day threshold and `HALF_DAY` after lowering it to 25%, with no shift or
+code change in between. Two new unit tests in the existing
+`AttendanceCalculationServiceTest` cover the same thing at the calculation
+layer directly. Full backend suite: 126 tests across 18 classes, all
+passing.
+
+### 12b. Frontend: a fourth Masters tab
+
+`api/attendanceRules.js` and `pages/Masters/AttendanceRule.jsx` mirror
+`salaryRules.js`/`SalaryRule.jsx` exactly - three fields
+(`entryWindowBufferMinutes`, `fullDayThresholdPercent`,
+`halfDayThresholdPercent`), same load/save/skeleton/error pattern. Added as
+a fourth tab in `MastersLayout.jsx` and routed at `/masters/attendance-rule`
+in `App.js`. `constants/permissions.js` gained `ATTENDANCE_RULE_READ`/`_MANAGE`
+in both `HR_ADMIN_PERMISSIONS` and `PERMISSION_CODES`, mirroring the backend
+`PermissionSeeder` change.
+
+Unlike `SalaryRule.jsx`, there's no "regenerate all" shortcut button - the
+existing `Attendance → Generate` page already re-runs generation for a
+chosen month/employees, and duplicating that here would be a second
+implementation of the same action for no reason. The page's info banner
+points there instead.
+
+Verification: same shape as §11b - the backend HTTP test proves the
+underlying behavior end-to-end, and the frontend compiles/serves with no
+console errors (again, no code-splitting, so a broken import here would
+have broken the whole app, not just this page). **Not done:** logging in
+and clicking through the actual page - blocked by the same seeded-org gap
+as §10d and §11b.
+
+---
+
+## 13. HR entering an already-approved leave directly, plus its CSV bulk variant (2026-08-16)
+
+The ask: HR/Admin should be able to backfill a leave for a day that already
+happened - an employee took time off informally, and at month-end HR wants
+attendance/payroll to reflect it correctly - without forcing that through
+the full apply → supervisor-endorse → HR-approve chain the self-service
+`Apply` page uses. Same "HR bypasses the normal state machine" shape as
+§12's `AttendanceRule` work and, further back, `AttendanceService.correctDay`
+- but for leave, not attendance.
+
+### 13a. Backend: a second entry point into `APPROVED`, not a second workflow
+
+New `POST /api/leaves/hr-create` (`Accusharp/src/main/java/com/accusharp/hrms/`,
+`LeaveService.hrDirectCreate` + `dto/LeaveHrDirectRequest.java`) skips
+`apply`/`supervisorApprove` entirely: same date/overlap/balance validations
+`apply` runs - **hard-blocks on insufficient balance**, the option chosen
+over letting a manual entry silently overdraw it - then goes straight to
+`APPROVED` and consumes balance immediately, same as `approve` does. Gated
+by the existing `LEAVE_APPROVE` permission (no new permission code - if you
+can approve a leave, you can enter one directly). CSV bulk variant is
+`POST /api/leaves/bulk-import` (`LeaveCsvParser`, header
+`userId,leaveType,fromDate,toDate,duration,reason`), same
+`BulkImportResult`-per-row shape as every other bulk/CSV endpoint in this
+app.
+
+The one schema change: `LeaveRequest` gained an `origin` column
+(`SELF_SERVICE`/`HR_DIRECT`, new enum `LeaveOrigin`) - nothing previously
+distinguished an HR-direct-approved leave from a normally-approved one once
+both sit at `APPROVED`, the same gap `DailyAttendance.recordStatus`
+(`GENERATED`/`MANUAL`) already closes for attendance. `LeaveResponse` grew
+an `origin` field to carry it to the frontend.
+
+New `LeaveHrDirectHttpTest` proves: a direct entry lands `APPROVED` with
+`origin=HR_DIRECT` and consumes balance immediately; it hard-blocks past the
+12-day CASUAL_LEAVE quota with the same message self-apply would give; a
+plain EMPLOYEE gets 403; the bulk CSV endpoint handles a mixed
+success/overlap/bad-date/unknown-type file the same independent-row way the
+employee bulk import does; and - the part that actually matters - a leave
+entered this way is picked up by `GET /api/attendance/{userId}` as
+`ON_LEAVE`, identical to one that went through the normal chain, with no
+extra wiring needed (`LeaveCalculationService` only ever filtered by
+`status == APPROVED` and date range, never by provenance). Full suite: 131
+tests across 19 classes, all passing.
+
+### 13b. Frontend: an "Add leave" dialog and a bulk-import page
+
+`api/leaves.js` gained `hrDirectCreate`/`bulkImport` (the latter mirrors
+`employees.js`'s `bulkImport` exactly, including the `'Content-Type':
+undefined` trick so the browser sets the multipart boundary itself).
+
+New `components/AddLeaveDialog.jsx` - a form dialog (employee picker, leave
+type, duration, from/to date, reason) wired into `AllLeaves.jsx`'s new "Add
+Leave" button. On success it switches the status filter to `APPROVED` so
+the new row is visible immediately rather than landing silently in whatever
+status the current filter excludes. `AllLeaves.jsx` also gained an `origin`
+column (renders "HR entered" vs "Self-service") and a "Bulk Import" button
+routed to a new standalone page, `pages/Leave/BulkImportLeaves.jsx` -
+outside `LeaveLayout`'s tabs, same as `BulkImportEmployees.jsx` sits outside
+`MastersLayout`'s. Its template is a plain CSV (`utils/csv.js`'s
+`downloadCsv`), not a styled `.xlsx` like §11's employee template - a
+deliberate scope call: this CSV has one free-text column (`userId`) against
+mostly enums and dates, a much smaller surface for the kind of formatting
+mistakes the xlsx template's red-required-fields/dropdowns were built to
+prevent, so building a second `exceljs` generator for it wasn't worth the
+duplication.
+
+Verification: same shape as §11b/§12b - the backend HTTP test proves the
+underlying behavior end-to-end, and the frontend compiles/serves with no
+console errors. One real hiccup this time: the dev server on :3000 (left
+running from §12's session) was accepting TCP connections but not actually
+responding - a hung `react-scripts start` process, not a code issue. Killed
+it and started fresh; not something to read into. **Not done:** logging in
+and clicking through the actual page - the same seeded-org gap as §10d,
+§11b and §12b.
+
+---
+
+## 14. Employee Category master + Gender/UAN/ESIC/bank fields, full CSV export (2026-08-17)
+
+The ask: six new fields on the employee record - Category (a company-defined
+grade: Worker/Supervisor/Manager/Director/...), Gender, UAN No, ESIC IP No,
+Bank Account No, Bank IFSC No - all optional, "apply everywhere we use this
+emp." Category was explicitly asked to work "like department and designation"
+- a company-manageable catalog, not a fixed enum - so it got the full
+`Department`/`Designation` treatment rather than being folded into
+`EmployeeStatus`-style enum.
+
+### 14a. Backend: a fourth master mirroring `Department`/`Designation` exactly
+
+New `Category` entity/repository/service/controller/DTO
+(`Accusharp/src/main/java/com/accusharp/hrms/{entity,repository,service,
+controller,dto}/Category*.java`) at `/api/categories` - same per-company +
+`company IS NULL` shared-row shape, same code-uniqueness/read/write-scoping
+rules as `Department`. New permissions `CATEGORY_MANAGE`/`CATEGORY_READ`,
+granted HR/ADMIN (manage) and also SUPERVISOR/EMPLOYEE (read-only) in
+`PermissionSeeder` - identical placement to `DEPARTMENT_*`/`DESIGNATION_*`.
+`DataSeeder.seedCategories()` seeds five shared defaults (`WORKER`, `STAFF`,
+`SUPERVISOR`, `MANAGER`, `DIRECTOR`) unconditionally on every boot - see the
+correction added to §1 above for why that's unlike department/designation.
+
+`Employee` gained `category` (FK, nullable), `gender` (new enum `Gender`:
+`MALE`/`FEMALE`), `uanNo`, `esicIpNo`, `bankAccountNo`, `bankIfscNo` (plain
+optional strings, no validation beyond a max length) - threaded through
+`EmployeeRequest` → `EmployeeService.apply()` → `EmployeeMapper` →
+`EmployeeResponse`, and through `EmployeeCsvParser`'s CSV header (all six
+new columns optional, same as every other non-required column). Full
+backend suite: 133 tests across 20 classes, all passing.
+
+### 14b. Frontend: Categories tab, employee form/detail, report export
+
+`api/categories.js` + `pages/Masters/Categories.jsx` mirror
+`departments.js`/`Departments.jsx` exactly (`createCrudApi` + `MasterCrudPage`)
+- added as a fifth `MastersLayout` tab, routed at `/masters/categories`.
+
+`EmployeeForm.jsx` gained a Category select (Organisation card, optional -
+unlike the required Department/Designation selects) and a Gender select
+(Identity card), plus a new "Statutory & bank details" card (UAN No, ESIC IP
+No, Bank Account No, Bank IFSC No) - all four plain optional text fields,
+none affect `requiredOk` or any calculation. `EmployeeDetail.jsx` mirrors the
+same two additions for display. `EmployeeList.jsx`/`MyTeam.jsx`/
+`Reports/EmployeesReport.jsx` each gained a Category column, consistent with
+their existing Department/Designation columns.
+
+`constants/enums.js` gained `GENDER = ['MALE', 'FEMALE']`.
+`constants/permissions.js` gained `CATEGORY_MANAGE`/`CATEGORY_READ` in
+`HR_ADMIN_PERMISSIONS`, the `SUPERVISOR`/`EMPLOYEE` read-only lists, and
+`PERMISSION_CODES` (the custom-role checklist source) - **this was nearly
+missed**: nothing in the UI currently calls `can('CATEGORY_READ')` directly
+(Masters tabs are gated by role via `navConfig.js`, not by permission code),
+so the app would have run fine without this, but `RoleDetail.jsx`'s
+custom-role permission checklist reads straight from `PERMISSION_CODES` -
+without this fix, an ADMIN building a custom role would never see
+`CATEGORY_MANAGE`/`CATEGORY_READ` as grantable options at all, even though
+the backend fully supports granting them. Caught by re-reading this file's
+own §3 note that `permissions.js` "must be kept in sync with the backend by
+hand" - worth remembering for the *next* new permission code too, since
+nothing enforces this automatically.
+
+`utils/employeeTemplate.js`'s bulk-import `.xlsx` template gained the same
+six columns (`categoryId`, `gender` with dropdown validation, `uanNo`,
+`esicIpNo`, `bankAccountNo`, `bankIfscNo`), all optional. This pushed the
+sheet to 29 columns, past column Z - `colLetter()` was a bare
+`String.fromCharCode(65 + index)` that only ever produced single letters, so
+every column reference past Z (`[`, `\`, `]`, ...) would have been silently
+wrong. Rewritten as a proper base-26 converter (`Z` → `AA` → `AB` → ...)
+before adding the new columns, not after - this was a real bug the template
+was one growth-spurt away from hitting regardless of this change, not
+something introduced by it.
+
+### 14c. Employee Master report becomes the "export everything" surface
+
+Rather than add a new download button somewhere, `Reports/EmployeesReport.jsx`
+(`/reports/employees`, already had `ReportPage`'s built-in "Export CSV")
+had its column list widened from 10 fields to the full ~30-field set the
+bulk-import template accepts - company/department/designation/category
+(as names, not the IDs the import template needs, since this is a read
+surface not a re-import file - and bulk-import is create-only besides, so an
+ID-based round-trip wouldn't work anyway), supervisor, dates, gender,
+employment/role/record status, contact info, the four new statutory/bank
+fields, and the full salary structure. "Export CSV" downloads exactly what's
+in the grid.
+
+### 14d. Verification
+
+Backend: `./mvnw test` - 133/133 passing (includes existing
+`EmployeeCsvParserTest`/`EmployeeSalaryStructureHttpTest`/
+`EmployeeSalaryRevisionHttpTest`, none of which needed changes since every
+new field is optional). Frontend: `CI=true npx react-scripts build` - clean,
+zero warnings, after every change in this section including the
+`permissions.js` fix. **Not done:** logging in and clicking through the
+actual page - same blocker as §10d/§11b/§12b/§13b, plus this session
+specifically found port 8080 already held by the user's own long-running
+IntelliJ-launched backend instance (9h uptime) rather than the seeded-org
+gap; left it untouched rather than restarting someone else's active dev
+session. Whoever picks this up next should restart that backend (a plain
+rebuild is enough - `ddl-auto=update` adds the new `category` table and
+`employee` columns on its own) before clicking through Categories/the new
+employee fields for real.

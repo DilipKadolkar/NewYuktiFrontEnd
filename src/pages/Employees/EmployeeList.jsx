@@ -84,6 +84,7 @@ export default function EmployeeList() {
     { field: 'userId', headerName: 'User ID', width: 110 },
     { field: 'departmentName', headerName: 'Department', width: 150 },
     { field: 'designationName', headerName: 'Designation', width: 160 },
+    { field: 'categoryName', headerName: 'Category', width: 130 },
     { field: 'supervisorName', headerName: 'Supervisor', width: 150 },
     {
       field: 'role',

@@ -143,7 +143,7 @@ export default function MasterCrudPage({
             open={!!deleteTarget}
             title={`Delete ${entityLabel}?`}
             description={`This will permanently remove "${
-              deleteTarget?.companyName || deleteTarget?.departmentName || deleteTarget?.designationName || deleteTarget?.shiftName || ''
+              deleteTarget?.companyName || deleteTarget?.departmentName || deleteTarget?.designationName || deleteTarget?.categoryName || deleteTarget?.shiftName || ''
             }". This cannot be undone.`}
             confirmLabel="Delete"
             confirmColor="error"

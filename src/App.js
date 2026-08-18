@@ -10,7 +10,9 @@ import MastersLayout from './pages/Masters/MastersLayout';
 import Companies from './pages/Masters/Companies';
 import Departments from './pages/Masters/Departments';
 import Designations from './pages/Masters/Designations';
+import Categories from './pages/Masters/Categories';
 import SalaryRule from './pages/Masters/SalaryRule';
+import AttendanceRule from './pages/Masters/AttendanceRule';
 import EmployeeList from './pages/Employees/EmployeeList';
 import EmployeeForm from './pages/Employees/EmployeeForm';
 import EmployeeDetail from './pages/Employees/EmployeeDetail';
@@ -34,6 +36,7 @@ import LeaveApply from './pages/Leave/Apply';
 import MyLeaves from './pages/Leave/MyLeaves';
 import PendingApprovals from './pages/Leave/PendingApprovals';
 import AllLeaves from './pages/Leave/AllLeaves';
+import BulkImportLeaves from './pages/Leave/BulkImportLeaves';
 import LeaveCalendar from './pages/Leave/Calendar';
 import LeaveBalances from './pages/Leave/Balances';
 import PayrollLayout from './pages/Payroll/PayrollLayout';
@@ -87,7 +90,9 @@ function App() {
             <Route path="companies" element={<Companies />} />
             <Route path="departments" element={<Departments />} />
             <Route path="designations" element={<Designations />} />
+            <Route path="categories" element={<Categories />} />
             <Route path="salary-rule" element={<SalaryRule />} />
+            <Route path="attendance-rule" element={<AttendanceRule />} />
           </Route>
 
           <Route path="/employees" element={<EmployeeList />} />
@@ -127,6 +132,7 @@ function App() {
             <Route path="calendar" element={<LeaveCalendar />} />
             <Route path="balances" element={<LeaveBalances />} />
           </Route>
+          <Route path="/leave/bulk-import" element={<BulkImportLeaves />} />
 
           <Route path="/payroll" element={<PayrollLayout />}>
             <Route index element={<PayrollGenerate />} />

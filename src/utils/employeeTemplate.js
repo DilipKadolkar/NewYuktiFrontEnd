@@ -12,14 +12,20 @@ const INFO_COLUMNS = [
   { field: 'companyId', required: false },
   { field: 'departmentId', required: false },
   { field: 'designationId', required: false },
+  { field: 'categoryId', required: false },
   { field: 'supervisorUserId', required: false },
   { field: 'joiningDate', required: false },
   { field: 'dateOfBirth', required: false },
+  { field: 'gender', required: false },
   { field: 'status', required: true },
   { field: 'recordStatus', required: false },
   { field: 'role', required: false },
   { field: 'email', required: false },
   { field: 'phone', required: false },
+  { field: 'uanNo', required: false },
+  { field: 'esicIpNo', required: false },
+  { field: 'bankAccountNo', required: false },
+  { field: 'bankIfscNo', required: false },
 ];
 
 const SALARY_COLUMNS = [
@@ -38,9 +44,12 @@ const COLUMNS = [...INFO_COLUMNS, ...SALARY_COLUMNS];
 
 const EXAMPLE_ROW = {
   userId: 'EMP010', employeeCode: 'AC010', employeeName: 'Jane Doe', companyId: '',
-  departmentId: '1', designationId: '1', supervisorUserId: 'SUP001', joiningDate: '2026-09-01',
-  dateOfBirth: '1995-04-12', status: 'PERMANENT', recordStatus: 'ACTIVE', role: 'EMPLOYEE',
-  email: 'jane.doe@example.com', phone: '9876543210', grossSalary: '30000', pfBasic: '15000',
+  departmentId: '1', designationId: '1', categoryId: '', supervisorUserId: 'SUP001',
+  joiningDate: '2026-09-01', dateOfBirth: '1995-04-12', gender: 'FEMALE',
+  status: 'PERMANENT', recordStatus: 'ACTIVE', role: 'EMPLOYEE',
+  email: 'jane.doe@example.com', phone: '9876543210',
+  uanNo: '', esicIpNo: '', bankAccountNo: '', bankIfscNo: '',
+  grossSalary: '30000', pfBasic: '15000',
   medicalAllowance: '1250', otherAllowance: '1250', overtimeEligible: 'false',
   // Left blank so the example row still derives from the salary rule, same as before -
   // fill in all four (never just some) on a row to pin its exact structure instead.
@@ -50,6 +59,7 @@ const EXAMPLE_ROW = {
 const STATUS_OPTIONS = ['PERMANENT', 'DAY_WISE', 'CONTRACT', 'INTERN'];
 const RECORD_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE'];
 const ROLE_OPTIONS = ['ADMIN', 'HR', 'SUPERVISOR', 'EMPLOYEE'];
+const GENDER_OPTIONS = ['MALE', 'FEMALE'];
 const BOOLEAN_OPTIONS = ['true', 'false'];
 
 const HEADER_ROW = 6;
@@ -61,8 +71,18 @@ const INFO_FILL = 'FF1565C0';
 const SALARY_FILL = 'FF2E7D32';
 const EXAMPLE_FILL = 'FFF5F5F5';
 
+// Base-26 Excel column letters (A, B, ... Z, AA, AB, ...) - a plain
+// String.fromCharCode(65 + index) only holds up to column Z (index 25),
+// which the sheet now exceeds with 29 columns.
 function colLetter(index) {
-  return String.fromCharCode(65 + index);
+  let n = index + 1;
+  let letters = '';
+  while (n > 0) {
+    const remainder = (n - 1) % 26;
+    letters = String.fromCharCode(65 + remainder) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
 }
 
 function addDropdown(sheet, field, options) {
@@ -134,6 +154,7 @@ export async function downloadEmployeeTemplate() {
   addDropdown(sheet, 'status', STATUS_OPTIONS);
   addDropdown(sheet, 'recordStatus', RECORD_STATUS_OPTIONS);
   addDropdown(sheet, 'role', ROLE_OPTIONS);
+  addDropdown(sheet, 'gender', GENDER_OPTIONS);
   addDropdown(sheet, 'overtimeEligible', BOOLEAN_OPTIONS);
 
   sheet.views = [{ state: 'frozen', ySplit: HEADER_ROW }];

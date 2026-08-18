@@ -7,7 +7,9 @@ const TABS = [
   { label: 'Companies', path: '/masters/companies' },
   { label: 'Departments', path: '/masters/departments' },
   { label: 'Designations', path: '/masters/designations' },
+  { label: 'Categories', path: '/masters/categories' },
   { label: 'Salary Rule', path: '/masters/salary-rule' },
+  { label: 'Attendance Rule', path: '/masters/attendance-rule' },
 ];
 
 export default function MastersLayout() {
