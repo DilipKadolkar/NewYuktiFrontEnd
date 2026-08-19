@@ -1,4 +1,6 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import LinearProgress from '@mui/material/LinearProgress';
 import AppLayout from './layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -48,27 +50,34 @@ import PayrollEmployeeHistory from './pages/Payroll/EmployeeHistory';
 import SalarySlip from './pages/SalarySlips/SalarySlip';
 import MySalarySlip from './pages/SalarySlips/MySalarySlip';
 import ReportsHub from './pages/Reports/ReportsHub';
-import EmployeesReport from './pages/Reports/EmployeesReport';
-import AttendanceMonthlyReport from './pages/Reports/AttendanceMonthlyReport';
-import LateComingReport from './pages/Reports/LateComingReport';
-import AbsentReport from './pages/Reports/AbsentReport';
-import OvertimeReport from './pages/Reports/OvertimeReport';
-import LopReport from './pages/Reports/LopReport';
-import LeaveBalancesReport from './pages/Reports/LeaveBalancesReport';
-import PayrollReport from './pages/Reports/PayrollReport';
-import PayrollByDepartmentReport from './pages/Reports/PayrollByDepartmentReport';
-import PayrollByCompanyReport from './pages/Reports/PayrollByCompanyReport';
-import PfReport from './pages/Reports/PfReport';
-import ProfessionalTaxReport from './pages/Reports/ProfessionalTaxReport';
-import EsicReport from './pages/Reports/EsicReport';
 import RolesList from './pages/Roles/RolesList';
 import RoleDetail from './pages/Roles/RoleDetail';
 import AuditLog from './pages/AuditLog/AuditLog';
 import OnboardCompany from './pages/Platform/OnboardCompany';
+// The 13 concrete report pages are lazy-loaded - HANDOFF.md's own flagged
+// best code-splitting candidate: rarely all used in one session, and each
+// pulls in DataGrid column defs that don't need to sit in the main bundle.
+const EmployeesReport = lazy(() => import('./pages/Reports/EmployeesReport'));
+const AttendanceMonthlyReport = lazy(() => import('./pages/Reports/AttendanceMonthlyReport'));
+const LateComingReport = lazy(() => import('./pages/Reports/LateComingReport'));
+const AbsentReport = lazy(() => import('./pages/Reports/AbsentReport'));
+const OvertimeReport = lazy(() => import('./pages/Reports/OvertimeReport'));
+const LopReport = lazy(() => import('./pages/Reports/LopReport'));
+const LeaveBalancesReport = lazy(() => import('./pages/Reports/LeaveBalancesReport'));
+const PayrollReport = lazy(() => import('./pages/Reports/PayrollReport'));
+const PayrollByDepartmentReport = lazy(() => import('./pages/Reports/PayrollByDepartmentReport'));
+const PayrollByCompanyReport = lazy(() => import('./pages/Reports/PayrollByCompanyReport'));
+const PfReport = lazy(() => import('./pages/Reports/PfReport'));
+const ProfessionalTaxReport = lazy(() => import('./pages/Reports/ProfessionalTaxReport'));
+const EsicReport = lazy(() => import('./pages/Reports/EsicReport'));
 
 // Plain EMPLOYEE lacks DASHBOARD_READ (see PermissionSeeder) and would 403 on
 // the dashboard's data calls; PLATFORM principals have no company dashboard
 // at all. Route each principal to a landing page it actually has access to.
+function withSuspense(element) {
+  return <Suspense fallback={<LinearProgress />}>{element}</Suspense>;
+}
+
 function RootRedirect() {
   const { isPlatform, isEmployee } = useAuth();
   if (isPlatform) return <Navigate to="/platform/companies" replace />;
@@ -147,19 +156,34 @@ function App() {
           <Route path="/salary-slips" element={<SalarySlip />} />
 
           <Route path="/reports" element={<ReportsHub />} />
-          <Route path="/reports/employees" element={<EmployeesReport />} />
-          <Route path="/reports/attendance/monthly" element={<AttendanceMonthlyReport />} />
-          <Route path="/reports/attendance/late-coming" element={<LateComingReport />} />
-          <Route path="/reports/attendance/absent" element={<AbsentReport />} />
-          <Route path="/reports/attendance/overtime" element={<OvertimeReport />} />
-          <Route path="/reports/attendance/lop" element={<LopReport />} />
-          <Route path="/reports/leave-balances" element={<LeaveBalancesReport />} />
-          <Route path="/reports/payroll" element={<PayrollReport />} />
-          <Route path="/reports/payroll/by-department" element={<PayrollByDepartmentReport />} />
-          <Route path="/reports/payroll/by-company" element={<PayrollByCompanyReport />} />
-          <Route path="/reports/statutory/pf" element={<PfReport />} />
-          <Route path="/reports/statutory/professional-tax" element={<ProfessionalTaxReport />} />
-          <Route path="/reports/statutory/esic" element={<EsicReport />} />
+          <Route path="/reports/employees" element={withSuspense(<EmployeesReport />)} />
+          <Route
+            path="/reports/attendance/monthly"
+            element={withSuspense(<AttendanceMonthlyReport />)}
+          />
+          <Route
+            path="/reports/attendance/late-coming"
+            element={withSuspense(<LateComingReport />)}
+          />
+          <Route path="/reports/attendance/absent" element={withSuspense(<AbsentReport />)} />
+          <Route path="/reports/attendance/overtime" element={withSuspense(<OvertimeReport />)} />
+          <Route path="/reports/attendance/lop" element={withSuspense(<LopReport />)} />
+          <Route path="/reports/leave-balances" element={withSuspense(<LeaveBalancesReport />)} />
+          <Route path="/reports/payroll" element={withSuspense(<PayrollReport />)} />
+          <Route
+            path="/reports/payroll/by-department"
+            element={withSuspense(<PayrollByDepartmentReport />)}
+          />
+          <Route
+            path="/reports/payroll/by-company"
+            element={withSuspense(<PayrollByCompanyReport />)}
+          />
+          <Route path="/reports/statutory/pf" element={withSuspense(<PfReport />)} />
+          <Route
+            path="/reports/statutory/professional-tax"
+            element={withSuspense(<ProfessionalTaxReport />)}
+          />
+          <Route path="/reports/statutory/esic" element={withSuspense(<EsicReport />)} />
 
           <Route path="/roles" element={<RolesList />} />
           <Route path="/roles/:id" element={<RoleDetail />} />

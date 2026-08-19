@@ -14,7 +14,7 @@ export default function PageHeader({ title, subtitle, actions }) {
       }}
     >
       <Box>
-        <Typography variant="h5" sx={{ color: 'text.primary' }}>
+        <Typography variant="h4" sx={{ color: 'text.primary' }}>
           {title}
         </Typography>
         {subtitle && (

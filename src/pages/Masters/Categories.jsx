@@ -1,5 +1,6 @@
 import MasterCrudPage from '../../components/MasterCrudPage';
 import categoriesApi from '../../api/categories';
+import { useAuth } from '../../context/AuthContext';
 
 const columns = [
   { field: 'categoryCode', headerName: 'Code', width: 130 },
@@ -14,6 +15,7 @@ const fields = [
 ];
 
 export default function Categories() {
+  const { can } = useAuth();
   return (
     <MasterCrudPage
       title="Categories"
@@ -22,6 +24,7 @@ export default function Categories() {
       columns={columns}
       fields={fields}
       entityLabel="Category"
+      readOnly={!can('CATEGORY_MANAGE')}
     />
   );
 }

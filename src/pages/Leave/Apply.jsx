@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import Card from '@mui/material/Card';
@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
+import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
@@ -29,6 +30,12 @@ export default function Apply() {
   const isHalfDayInvalid = duration !== 'FULL_DAY' && fromDate && toDate && !fromDate.isSame(toDate, 'day');
   const isValid = actingAs && leaveType && fromDate && toDate && duration && !isHalfDayInvalid;
 
+  const totalDays = useMemo(() => {
+    if (!fromDate || !toDate || isHalfDayInvalid) return null;
+    if (duration !== 'FULL_DAY') return 0.5;
+    return toDate.diff(fromDate, 'day') + 1;
+  }, [fromDate, toDate, duration, isHalfDayInvalid]);
+
   const handleSubmit = () => {
     setSaving(true);
     leavesApi
@@ -41,7 +48,7 @@ export default function Apply() {
         reason,
       })
       .then(() => {
-        enqueueSnackbar('Leave applied', { variant: 'success' });
+        enqueueSnackbar('Leave request submitted', { variant: 'success' });
         navigate('/leave/my');
       })
       .catch(() => {})
@@ -51,22 +58,17 @@ export default function Apply() {
   return (
     <>
       <PageHeader
-        title="Apply Leave"
-        subtitle={actingAs ? `Applying as ${actingAs.employeeName} (${actingAs.userId})` : ''}
-        actions={
-          <Button variant="contained" onClick={handleSubmit} disabled={!isValid || saving}>
-            Submit
-          </Button>
-        }
+        title="Apply for leave"
+        subtitle={actingAs ? `Requesting as ${actingAs.employeeName} (${actingAs.userId})` : ''}
       />
-      <Card>
-        <CardContent>
-          <Grid container spacing={2}>
+      <Card sx={{ maxWidth: 640 }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+          <Grid container spacing={2.5}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select
                 fullWidth
-                size="small"
+                required
                 label="Leave type"
                 value={leaveType}
                 onChange={(e) => setLeaveType(e.target.value)}
@@ -82,10 +84,11 @@ export default function Apply() {
               <TextField
                 select
                 fullWidth
-                size="small"
+                required
                 label="Duration"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
+                helperText="Half day only applies when From and To are the same day"
               >
                 {LEAVE_DURATION.map((d) => (
                   <MenuItem key={d} value={d}>
@@ -99,7 +102,7 @@ export default function Apply() {
                 label="From date"
                 value={fromDate}
                 onChange={setFromDate}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                slotProps={{ textField: { fullWidth: true, required: true } }}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -107,26 +110,46 @@ export default function Apply() {
                 label="To date"
                 value={toDate}
                 onChange={setToDate}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                slotProps={{ textField: { fullWidth: true, required: true } }}
               />
             </Grid>
-            {isHalfDayInvalid && (
+            {isHalfDayInvalid ? (
               <Grid size={12}>
                 <Alert severity="warning">
-                  A half day is only valid when the from and to dates are the same.
+                  A half day request needs the same From and To date.
                 </Alert>
               </Grid>
+            ) : (
+              totalDays != null && (
+                <Grid size={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    This request covers <strong>{totalDays}</strong> day{totalDays === 1 ? '' : 's'}.
+                  </Typography>
+                </Grid>
+              )
             )}
             <Grid size={12}>
               <TextField
                 fullWidth
-                size="small"
                 multiline
-                minRows={2}
+                minRows={3}
                 label="Reason"
+                placeholder="Let your manager know why you're taking leave"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
+            </Grid>
+            <Grid size={12}>
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                onClick={handleSubmit}
+                disabled={!isValid || saving}
+                data-testid="leave-submit-button"
+              >
+                {saving ? 'Submitting…' : 'Submit request'}
+              </Button>
             </Grid>
           </Grid>
         </CardContent>

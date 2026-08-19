@@ -2,6 +2,20 @@ import ReportPage from './ReportPage';
 import StatusChip from '../../components/StatusChip';
 import reportsApi from '../../api/reports';
 import { RECORD_STATUS_COLOR, ROLE_COLOR, labelize } from '../../constants/enums';
+import { maskSensitive } from '../../utils/mask';
+
+// Masked on-screen and in the exported CSV alike, same as the Employee
+// Detail page - this report's fetchFn feeds both the table and the export.
+const fetchMasked = () =>
+  reportsApi.employees().then((rows) =>
+    rows.map((r) => ({
+      ...r,
+      uanNo: maskSensitive(r.uanNo),
+      esicIpNo: maskSensitive(r.esicIpNo),
+      bankAccountNo: maskSensitive(r.bankAccountNo),
+      bankIfscNo: maskSensitive(r.bankIfscNo),
+    }))
+  );
 
 // Same field set (and order) as the bulk-import template (utils/employeeTemplate.js) /
 // EmployeeCsvParser.java's CSV header, but with master IDs shown as names - readable
@@ -56,7 +70,7 @@ export default function EmployeesReport() {
       title="Employee Master"
       subtitle="Full employee directory, every field the bulk-import template accepts - export to CSV from here"
       filterType="none"
-      fetchFn={reportsApi.employees}
+      fetchFn={fetchMasked}
       columns={columns}
     />
   );

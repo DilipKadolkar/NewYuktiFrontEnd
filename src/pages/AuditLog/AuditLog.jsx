@@ -135,7 +135,16 @@ export default function AuditLog() {
         )}
       </Stack>
 
-      <DataTable rows={rows} columns={columns} loading={loading} height={560} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={560}
+        emptyState={{
+          title: 'No audit activity yet',
+          description: 'Security-sensitive actions will show up here as they happen.',
+        }}
+      />
 
       <Dialog open={purgeOpen} onClose={() => setPurgeOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Purge audit rows?</DialogTitle>

@@ -13,6 +13,10 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Alert from '@mui/material/Alert';
 import Skeleton from '@mui/material/Skeleton';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
@@ -74,8 +78,13 @@ export default function EmployeeForm() {
   const [designations, setDesignations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(isEdit);
+  const [mastersLoaded, setMastersLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tempPassword, setTempPassword] = useState(null);
+  // Bank/statutory fields are masked (type="password") until individually revealed -
+  // they're editable, so unlike the read-only detail page a plain mask isn't enough.
+  const [revealed, setRevealed] = useState({});
+  const toggleRevealed = (name) => setRevealed((prev) => ({ ...prev, [name]: !prev[name] }));
 
   useEffect(() => {
     Promise.all([
@@ -88,12 +97,18 @@ export default function EmployeeForm() {
       setDepartments(d);
       setDesignations(des);
       setCategories(cat);
+      setMastersLoaded(true);
     });
   }, []);
 
   useEffect(() => {
-    if (!isEdit || companies.length === 0 || departments.length === 0 || designations.length === 0)
-      return;
+    // Was gated on companies/departments/designations.length > 0, which is
+    // indistinguishable from "still loading" when a company genuinely has
+    // zero departments or designations configured yet - the edit form got
+    // stuck on its loading skeleton forever for a freshly onboarded company.
+    // department/designation are optional on an employee (see `?? ''` below),
+    // so an empty list is a valid loaded state, not a not-yet-loaded one.
+    if (!isEdit || !mastersLoaded) return;
     employeesApi.get(id).then((emp) => {
       const company = companies.find((c) => c.companyName === emp.companyName);
       const department = departments.find((d) => d.departmentName === emp.departmentName);
@@ -473,42 +488,43 @@ export default function EmployeeForm() {
         <CardHeader title={<Typography variant="subtitle1">Statutory & bank details</Typography>} />
         <CardContent sx={{ pt: 0 }}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="UAN No"
-                value={form.uanNo}
-                onChange={(e) => set('uanNo', e.target.value)}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="ESIC IP No"
-                value={form.esicIpNo}
-                onChange={(e) => set('esicIpNo', e.target.value)}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Bank Account No"
-                value={form.bankAccountNo}
-                onChange={(e) => set('bankAccountNo', e.target.value)}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Bank IFSC No"
-                value={form.bankIfscNo}
-                onChange={(e) => set('bankIfscNo', e.target.value.toUpperCase())}
-              />
-            </Grid>
+            {[
+              { name: 'uanNo', label: 'UAN No' },
+              { name: 'esicIpNo', label: 'ESIC IP No' },
+              { name: 'bankAccountNo', label: 'Bank Account No' },
+              { name: 'bankIfscNo', label: 'Bank IFSC No', upper: true },
+            ].map((f) => (
+              <Grid key={f.name} size={{ xs: 12, sm: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label={f.label}
+                  type={revealed[f.name] ? 'text' : 'password'}
+                  value={form[f.name]}
+                  onChange={(e) => set(f.name, f.upper ? e.target.value.toUpperCase() : e.target.value)}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            edge="end"
+                            aria-label={revealed[f.name] ? `Hide ${f.label}` : `Show ${f.label}`}
+                            onClick={() => toggleRevealed(f.name)}
+                          >
+                            {revealed[f.name] ? (
+                              <VisibilityOffRoundedIcon fontSize="small" />
+                            ) : (
+                              <VisibilityRoundedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Grid>
+            ))}
           </Grid>
         </CardContent>
       </Card>

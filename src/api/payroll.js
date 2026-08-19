@@ -18,6 +18,10 @@ const payroll = {
       .get(`/payroll/employee/${employeeId}/revisions`, { params: { month, year } })
       .then((r) => r.data),
   list: (month, year) => client.get('/payroll', { params: { month, year } }).then((r) => r.data),
+  // Read-only comparison of each employee's stored payroll snapshot against
+  // their current master data/salary rule - only meaningful once a payroll
+  // already exists for the period (see PayrollDebugRow on the backend).
+  debug: (month, year) => client.get('/payroll/debug', { params: { month, year } }).then((r) => r.data),
   // CSV bulk run for a whole company, one row per employee carrying that month's one-off
   // bonus/incentive/deduction amounts - month/year apply to the whole file. A row whose period
   // is already generated is reported as a row error unless regenerate=true. Returns

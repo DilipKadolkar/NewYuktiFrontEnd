@@ -1,5 +1,6 @@
 import MasterCrudPage from '../../components/MasterCrudPage';
 import departmentsApi from '../../api/departments';
+import { useAuth } from '../../context/AuthContext';
 
 const columns = [
   { field: 'departmentCode', headerName: 'Code', width: 130 },
@@ -14,6 +15,7 @@ const fields = [
 ];
 
 export default function Departments() {
+  const { can } = useAuth();
   return (
     <MasterCrudPage
       title="Departments"
@@ -22,6 +24,7 @@ export default function Departments() {
       columns={columns}
       fields={fields}
       entityLabel="Department"
+      readOnly={!can('DEPARTMENT_MANAGE')}
     />
   );
 }

@@ -16,10 +16,13 @@ import PageHeader from '../../components/PageHeader';
 import EmployeeMultiPicker from '../../components/EmployeeMultiPicker';
 import attendanceApi from '../../api/attendance';
 import { useActingAs } from '../../context/ActingAsContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Generate() {
   const { enqueueSnackbar } = useSnackbar();
   const { actingAs } = useActingAs();
+  const { can } = useAuth();
+  const canGenerate = can('ATTENDANCE_GENERATE');
   const [month, setMonth] = useState(dayjs());
   const [userIds, setUserIds] = useState([]);
   const [overwriteManual, setOverwriteManual] = useState(false);
@@ -52,9 +55,11 @@ export default function Generate() {
         title="Generate Attendance"
         subtitle="Turns punches into the attendance record payroll pays from. Rerun freely — manual corrections survive unless you choose to overwrite them."
         actions={
-          <Button variant="contained" onClick={handleGenerate} disabled={saving || !month}>
-            Generate
-          </Button>
+          canGenerate && (
+            <Button variant="contained" onClick={handleGenerate} disabled={saving || !month}>
+              Generate
+            </Button>
+          )
         }
       />
       <Card sx={{ mb: 2.5 }}>

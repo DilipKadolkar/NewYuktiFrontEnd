@@ -14,6 +14,7 @@ import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
 import customRolesApi from '../../api/customRoles';
 import { labelize } from '../../constants/enums';
+import { useAuth } from '../../context/AuthContext';
 
 // Grouped for a scannable checklist; platform-only codes (COMPANY_CREATE/
 // UPDATE/DELETE, AUDIT_MANAGE) are omitted entirely - CustomRoleService
@@ -41,6 +42,8 @@ export default function RoleDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
+  const { can } = useAuth();
+  const canManage = can('ROLE_MANAGE');
   const [role, setRole] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -92,9 +95,11 @@ export default function RoleDetail() {
             <Button color="inherit" onClick={() => navigate('/roles')}>
               Back
             </Button>
-            <Button variant="contained" onClick={handleSave} disabled={saving}>
-              Save permissions
-            </Button>
+            {canManage && (
+              <Button variant="contained" onClick={handleSave} disabled={saving}>
+                Save permissions
+              </Button>
+            )}
           </>
         }
       />
@@ -109,7 +114,14 @@ export default function RoleDetail() {
                   {group.codes.map((code) => (
                     <FormControlLabel
                       key={code}
-                      control={<Checkbox checked={selected.has(code)} onChange={() => toggle(code)} size="small" />}
+                      control={
+                        <Checkbox
+                          checked={selected.has(code)}
+                          onChange={() => toggle(code)}
+                          disabled={!canManage}
+                          size="small"
+                        />
+                      }
                       label={labelize(code)}
                     />
                   ))}

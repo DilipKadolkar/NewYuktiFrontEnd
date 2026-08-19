@@ -12,6 +12,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
 import attendanceRulesApi from '../../api/attendanceRules';
+import { useAuth } from '../../context/AuthContext';
 
 const FIELDS = [
   { name: 'entryWindowBufferMinutes', label: 'Entry window buffer', suffix: 'min' },
@@ -21,6 +22,8 @@ const FIELDS = [
 
 export default function AttendanceRule() {
   const { enqueueSnackbar } = useSnackbar();
+  const { can } = useAuth();
+  const canManage = can('ATTENDANCE_RULE_MANAGE');
   const [values, setValues] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,9 +71,11 @@ export default function AttendanceRule() {
         title="Attendance Rule"
         subtitle="How punches are turned into full days, half days and absences for this company"
         actions={
-          <Button variant="contained" onClick={handleSave} disabled={saving}>
-            Save changes
-          </Button>
+          canManage && (
+            <Button variant="contained" onClick={handleSave} disabled={saving}>
+              Save changes
+            </Button>
+          )
         }
       />
       <Alert severity="info" sx={{ mb: 2.5 }}>
@@ -89,6 +94,7 @@ export default function AttendanceRule() {
                   size="small"
                   label={f.label}
                   value={values[f.name] ?? ''}
+                  disabled={!canManage}
                   onChange={(e) => handleChange(f.name, e.target.value)}
                   slotProps={{
                     input: { endAdornment: <InputAdornment position="end">{f.suffix}</InputAdornment> },

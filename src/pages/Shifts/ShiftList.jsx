@@ -12,6 +12,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
@@ -21,6 +22,7 @@ import PageHeader from '../../components/PageHeader';
 import DataTable from '../../components/DataTable';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import shiftsApi from '../../api/shifts';
+import { useAuth } from '../../context/AuthContext';
 
 const emptyForm = {
   shiftCode: '',
@@ -61,6 +63,11 @@ function ShiftFormDialog({ open, editing, onClose, onSaved }) {
   const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
   const isValid = form.shiftCode && form.shiftName && form.startTime && form.endTime && form.workingHours > 0;
+  // Mirrors the backend's Shift.crossesMidnight(): true when end is not
+  // strictly after start. Shown proactively, before saving, per the
+  // redesign brief's overnight-shift example - not just after the fact.
+  const crossesMidnight =
+    form.startTime && form.endTime && !form.endTime.isAfter(form.startTime);
 
   const handleSubmit = () => {
     setSaving(true);
@@ -95,6 +102,11 @@ function ShiftFormDialog({ open, editing, onClose, onSaved }) {
         {warnings.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }} onClose={() => { setWarnings([]); onSaved(); onClose(); }}>
             {warnings.join(' ')}
+          </Alert>
+        )}
+        {warnings.length === 0 && crossesMidnight && (
+          <Alert severity="info" icon={<WarningAmberRoundedIcon fontSize="inherit" />} sx={{ mb: 2 }}>
+            Overnight shift — this shift crosses midnight. Please confirm the start and end times.
           </Alert>
         )}
         <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -188,6 +200,8 @@ function ShiftFormDialog({ open, editing, onClose, onSaved }) {
 
 export default function ShiftList() {
   const { enqueueSnackbar } = useSnackbar();
+  const { can } = useAuth();
+  const canManage = can('SHIFT_MANAGE');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -234,7 +248,20 @@ export default function ShiftList() {
       headerName: 'Crosses midnight',
       width: 150,
       renderCell: (params) =>
-        params.value ? <Chip label="Yes" size="small" color="info" /> : null,
+        params.value ? <Chip label="Overnight" size="small" color="info" /> : null,
+    },
+    {
+      field: 'warnings',
+      headerName: 'Warnings',
+      width: 90,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) =>
+        params.value?.length > 0 ? (
+          <Tooltip title={params.value.join(' ')}>
+            <WarningAmberRoundedIcon fontSize="small" color="warning" />
+          </Tooltip>
+        ) : null,
     },
     {
       field: 'actions',
@@ -242,26 +269,27 @@ export default function ShiftList() {
       sortable: false,
       filterable: false,
       width: 100,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Edit">
-            <IconButton
-              size="small"
-              onClick={() => {
-                setEditing(params.row);
-                setFormOpen(true);
-              }}
-            >
-              <EditRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete">
-            <IconButton size="small" onClick={() => setDeleteTarget(params.row)}>
-              <DeleteRoundedIcon fontSize="small" color="error" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
+      renderCell: (params) =>
+        canManage && (
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="Edit">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setEditing(params.row);
+                  setFormOpen(true);
+                }}
+              >
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" onClick={() => setDeleteTarget(params.row)}>
+                <DeleteRoundedIcon fontSize="small" color="error" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        ),
     },
   ];
 
@@ -271,19 +299,44 @@ export default function ShiftList() {
         title="Shifts"
         subtitle="Shift master — timing, break, grace and overtime window"
         actions={
-          <Button
-            variant="contained"
-            startIcon={<AddRoundedIcon />}
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            Add Shift
-          </Button>
+          canManage && (
+            <Button
+              variant="contained"
+              startIcon={<AddRoundedIcon />}
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              Add Shift
+            </Button>
+          )
         }
       />
-      <DataTable rows={rows} columns={columns} loading={loading} height={520} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={520}
+        emptyState={{
+          title: 'No shifts configured',
+          description: canManage
+            ? 'Create shifts to start scheduling attendance and rosters.'
+            : 'No shifts have been configured for this company yet.',
+          action: canManage && (
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              Add Shift
+            </Button>
+          ),
+        }}
+      />
 
       <ShiftFormDialog
         open={formOpen}

@@ -31,7 +31,8 @@ export default function Companies() {
   // COMPANY_CREATE/UPDATE/DELETE are platform-only (see PermissionSeeder) -
   // a company ADMIN/HR only holds COMPANY_READ, so this page is read-only for
   // them and full CRUD only for a platform principal (reused at /platform/companies).
-  const { isPlatform } = useAuth();
+  const { isPlatform, can } = useAuth();
+  const canManage = can('COMPANY_UPDATE');
   return (
     <MasterCrudPage
       title="Companies"
@@ -44,7 +45,7 @@ export default function Companies() {
       columns={columns}
       fields={fields}
       entityLabel="Company"
-      readOnly={!isPlatform}
+      readOnly={!canManage}
     />
   );
 }

@@ -49,6 +49,7 @@ import customRolesApi from '../../api/customRoles';
 import { RECORD_STATUS_COLOR, ROLE_COLOR, SALARY_REVISION_REASON, labelize } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
 import { useAuth } from '../../context/AuthContext';
+import { maskSensitive } from '../../utils/mask';
 
 function Field({ label, value }) {
   return (
@@ -373,10 +374,10 @@ export default function EmployeeDetail() {
             <CardHeader title={<Typography variant="subtitle1">Statutory & bank details</Typography>} />
             <CardContent sx={{ pt: 0 }}>
               <Grid container spacing={2}>
-                <Field label="UAN No" value={emp.uanNo} />
-                <Field label="ESIC IP No" value={emp.esicIpNo} />
-                <Field label="Bank Account No" value={emp.bankAccountNo} />
-                <Field label="Bank IFSC No" value={emp.bankIfscNo} />
+                <Field label="UAN No" value={maskSensitive(emp.uanNo)} />
+                <Field label="ESIC IP No" value={maskSensitive(emp.esicIpNo)} />
+                <Field label="Bank Account No" value={maskSensitive(emp.bankAccountNo)} />
+                <Field label="Bank IFSC No" value={maskSensitive(emp.bankIfscNo)} />
               </Grid>
             </CardContent>
           </Card>

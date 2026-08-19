@@ -28,6 +28,7 @@ import EmployeePicker from '../../components/EmployeePicker';
 import attendanceApi from '../../api/attendance';
 import { ATTENDANCE_STATUS, ATTENDANCE_STATUS_COLOR } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { useAuth } from '../../context/AuthContext';
 
 function CorrectionDialog({ open, record, userId, onClose, onSaved }) {
   const { enqueueSnackbar } = useSnackbar();
@@ -191,6 +192,10 @@ function CorrectionDialog({ open, record, userId, onClose, onSaved }) {
 export default function Records() {
   const { enqueueSnackbar } = useSnackbar();
   const { actingAs } = useActingAs();
+  const { can } = useAuth();
+  const canCorrect = can('ATTENDANCE_CORRECT');
+  const canUnlock = can('ATTENDANCE_UNLOCK');
+  const canGenerate = can('ATTENDANCE_GENERATE');
   const [userId, setUserId] = useState(null);
   const [month, setMonth] = useState(dayjs());
   const [rows, setRows] = useState([]);
@@ -289,15 +294,16 @@ export default function Records() {
       sortable: false,
       filterable: false,
       width: 70,
-      renderCell: (params) => (
-        <Tooltip title={params.row.locked ? 'Unlock the month first' : 'Correct'}>
-          <span>
-            <IconButton size="small" disabled={params.row.locked} onClick={() => setCorrecting(params.row)}>
-              <EditRoundedIcon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-      ),
+      renderCell: (params) =>
+        canCorrect && (
+          <Tooltip title={params.row.locked ? 'Unlock the month first' : 'Correct'}>
+            <span>
+              <IconButton size="small" disabled={params.row.locked} onClick={() => setCorrecting(params.row)}>
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        ),
     },
   ];
 
@@ -316,12 +322,16 @@ export default function Records() {
               onChange={setMonth}
               slotProps={{ textField: { size: 'small' } }}
             />
-            <Button startIcon={<LockOpenRoundedIcon />} onClick={handleUnlock} disabled={!userId || busy}>
-              Unlock month
-            </Button>
-            <Button startIcon={<RefreshRoundedIcon />} onClick={handleRefresh} disabled={busy}>
-              Refresh summaries
-            </Button>
+            {canUnlock && (
+              <Button startIcon={<LockOpenRoundedIcon />} onClick={handleUnlock} disabled={!userId || busy}>
+                Unlock month
+              </Button>
+            )}
+            {canGenerate && (
+              <Button startIcon={<RefreshRoundedIcon />} onClick={handleRefresh} disabled={busy}>
+                Refresh summaries
+              </Button>
+            )}
           </>
         }
       />
@@ -332,7 +342,15 @@ export default function Records() {
           No records for this month yet — generate attendance first from the Generate tab.
         </Alert>
       ) : (
-        <DataTable rows={rows} columns={columns} loading={loading} height={560} density="compact" />
+        <>
+          {rows.filter((r) => r.status === 'INVALID_PUNCH').length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }} data-testid="attendance-warning">
+              {rows.filter((r) => r.status === 'INVALID_PUNCH').length} day(s) have a single punch
+              only — correct them below before payroll is generated.
+            </Alert>
+          )}
+          <DataTable rows={rows} columns={columns} loading={loading} height={560} density="compact" />
+        </>
       )}
 
       <CorrectionDialog

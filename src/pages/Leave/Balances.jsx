@@ -20,6 +20,7 @@ import EmployeePicker from '../../components/EmployeePicker';
 import leaveBalancesApi from '../../api/leaveBalances';
 import { labelize } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { useAuth } from '../../context/AuthContext';
 
 function BalanceCard({ balance, canEdit, onEdit }) {
   const pct = balance.quota > 0 ? Math.min(100, (Number(balance.used) / Number(balance.quota)) * 100) : 0;
@@ -55,6 +56,8 @@ function BalanceCard({ balance, canEdit, onEdit }) {
 export default function Balances() {
   const { enqueueSnackbar } = useSnackbar();
   const { actingAs, isHrOrAdmin } = useActingAs();
+  const { can } = useAuth();
+  const canEditQuota = can('LEAVE_BALANCE_MANAGE');
   const [userId, setUserId] = useState(actingAs?.userId || null);
   const [year, setYear] = useState(new Date().getFullYear());
   const [balances, setBalances] = useState([]);
@@ -118,7 +121,7 @@ export default function Balances() {
             <Grid key={b.leaveType} size={{ xs: 12, sm: 6, md: 4 }}>
               <BalanceCard
                 balance={b}
-                canEdit={isHrOrAdmin}
+                canEdit={canEditQuota}
                 onEdit={() => {
                   setEditing(b);
                   setQuotaValue(String(b.quota));

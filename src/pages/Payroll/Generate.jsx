@@ -8,6 +8,10 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
+import Stack from '@mui/material/Stack';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
 import EmployeePicker from '../../components/EmployeePicker';
@@ -35,6 +39,59 @@ function Field({ label, value }) {
   );
 }
 
+// Surfaces the backend's stored-vs-live comparison for an employee that
+// already has a payroll for this period, so HR sees exactly what changed
+// before deciding to regenerate - rather than finding out after the fact.
+function PayrollReadiness({ debugRow }) {
+  if (!debugRow) return null;
+  const issues = [];
+  if (debugRow.masterDataDrifted) {
+    issues.push({
+      title: 'Employee salary details changed after this payroll was generated',
+      detail: (
+        <>
+          Gross salary: <MoneyText value={debugRow.storedGrossSalary} /> (stored) vs{' '}
+          <MoneyText value={debugRow.liveGrossSalary} /> (current). PF basic:{' '}
+          <MoneyText value={debugRow.storedPfBasic} /> (stored) vs{' '}
+          <MoneyText value={debugRow.livePfBasic} /> (current).
+        </>
+      ),
+    });
+  }
+  if (debugRow.ruleDrifted) {
+    issues.push({
+      title: 'The salary rule changed after this payroll was generated',
+      detail: `Basic+DA ${debugRow.storedRuleBasicDaPercent}% → ${debugRow.liveRuleBasicDaPercent}%, PF ${debugRow.storedRulePfPercent}% → ${debugRow.liveRulePfPercent}%, ESIC ${debugRow.storedRuleEsicPercent}% → ${debugRow.liveRuleEsicPercent}%.`,
+    });
+  }
+  if (issues.length === 0) return null;
+
+  return (
+    <Alert severity="warning" sx={{ mb: 2.5 }} data-testid="payroll-warning">
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        Payroll readiness — {issues.length} configuration issue{issues.length > 1 ? 's' : ''}{' '}
+        {issues.length > 1 ? 'need' : 'needs'} attention
+      </Typography>
+      <List dense disablePadding sx={{ mb: 0.5 }}>
+        {issues.map((issue) => (
+          <ListItem key={issue.title} disableGutters disablePadding sx={{ display: 'block', mb: 0.5 }}>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'flex-start' }}>
+              <WarningAmberRoundedIcon fontSize="small" sx={{ mt: 0.25 }} />
+              <Typography variant="body2">
+                {issue.title}. {issue.detail}
+              </Typography>
+            </Stack>
+          </ListItem>
+        ))}
+      </List>
+      <Typography variant="body2">
+        Regenerating will recalculate this payroll from the current data — review the numbers below
+        before you do.
+      </Typography>
+    </Alert>
+  );
+}
+
 export default function Generate() {
   const { enqueueSnackbar } = useSnackbar();
   const { actingAs } = useActingAs();
@@ -52,6 +109,7 @@ export default function Generate() {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [conflict, setConflict] = useState(false);
+  const [debugRow, setDebugRow] = useState(null);
 
   const isValid = employeeId && month >= 1 && month <= 12 && year;
 
@@ -69,10 +127,20 @@ export default function Generate() {
     fn(buildPayload())
       .then((res) => {
         setResult(res);
+        setDebugRow(null);
         enqueueSnackbar('Payroll generated', { variant: 'success' });
       })
       .catch((err) => {
-        if (err.status === 409) setConflict(true);
+        if (err.status === 409) {
+          setConflict(true);
+          // A conflict means a payroll already exists for this period, which
+          // is exactly when the stored-vs-live comparison becomes meaningful
+          // - a fresh generation has nothing yet to compare against.
+          payrollApi
+            .debug(month, year)
+            .then((rows) => setDebugRow(rows.find((r) => r.employeeId === employeeId) || null))
+            .catch(() => setDebugRow(null));
+        }
       })
       .finally(() => setSaving(false));
   };
@@ -130,18 +198,21 @@ export default function Generate() {
       </Card>
 
       {conflict && (
-        <Alert
-          severity="warning"
-          sx={{ mb: 2.5 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => runGenerate(payrollApi.regenerate)}>
-              Regenerate
-            </Button>
-          }
-        >
-          This period is already generated. Regenerate to create a new revision (the old one is marked
-          superseded).
-        </Alert>
+        <>
+          <PayrollReadiness debugRow={debugRow} />
+          <Alert
+            severity="warning"
+            sx={{ mb: 2.5 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => runGenerate(payrollApi.regenerate)}>
+                Regenerate
+              </Button>
+            }
+          >
+            This period is already generated. Regenerate to create a new revision (the old one is
+            marked superseded).
+          </Alert>
+        </>
       )}
 
       {result && (

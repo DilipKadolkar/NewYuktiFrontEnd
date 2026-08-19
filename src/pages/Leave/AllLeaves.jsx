@@ -13,6 +13,7 @@ import StatusChip from '../../components/StatusChip';
 import AddLeaveDialog from '../../components/AddLeaveDialog';
 import leavesApi from '../../api/leaves';
 import { LEAVE_STATUS, LEAVE_STATUS_COLOR, labelize } from '../../constants/enums';
+import { useAuth } from '../../context/AuthContext';
 
 const columns = [
   { field: 'userId', headerName: 'User ID', width: 100 },
@@ -50,6 +51,8 @@ const columns = [
 
 export default function AllLeaves() {
   const navigate = useNavigate();
+  const { can } = useAuth();
+  const canManage = can('LEAVE_APPROVE');
   const [status, setStatus] = useState('PENDING');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -97,20 +100,33 @@ export default function AllLeaves() {
                 </MenuItem>
               ))}
             </TextField>
-            <Button
-              variant="outlined"
-              startIcon={<UploadFileRoundedIcon />}
-              onClick={() => navigate('/leave/bulk-import')}
-            >
-              Bulk Import
-            </Button>
-            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setAddOpen(true)}>
-              Add Leave
-            </Button>
+            {canManage && (
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => navigate('/leave/bulk-import')}
+              >
+                Bulk Import
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setAddOpen(true)}>
+                Add Leave
+              </Button>
+            )}
           </Stack>
         }
       />
-      <DataTable rows={rows} columns={columns} loading={loading} height={560} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={560}
+        emptyState={{
+          title: 'No leave requests',
+          description: `No requests with status "${labelize(status)}" right now.`,
+        }}
+      />
       <AddLeaveDialog open={addOpen} onClose={() => setAddOpen(false)} onCreated={handleCreated} />
     </>
   );
