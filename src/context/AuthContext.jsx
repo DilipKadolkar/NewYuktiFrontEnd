@@ -12,6 +12,9 @@ export function AuthProvider({ children }) {
   const [principalType, setPrincipalType] = useState(() => getStoredAuth()?.principalType || null);
   const [username, setUsername] = useState(() => getStoredAuth()?.username || null);
   const [role, setRole] = useState(() => getStoredAuth()?.role || null);
+  const [mustChangePassword, setMustChangePassword] = useState(
+    () => !!getStoredAuth()?.mustChangePassword
+  );
   const [me, setMe] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [initializing, setInitializing] = useState(() => !!getStoredAuth()?.accessToken);
@@ -44,6 +47,7 @@ export function AuthProvider({ children }) {
     setPrincipalType(null);
     setUsername(null);
     setRole(null);
+    setMustChangePassword(false);
     setMe(null);
     setEmployees([]);
   }, []);
@@ -75,6 +79,7 @@ export function AuthProvider({ children }) {
         setPrincipalType(res.principalType);
         setUsername(res.username);
         setRole(res.role);
+        setMustChangePassword(!!res.mustChangePassword);
         return loadProfile(res.username, res.principalType).then(() => res);
       }),
     [loadProfile]
@@ -102,6 +107,7 @@ export function AuthProvider({ children }) {
       principalType,
       username,
       role,
+      mustChangePassword,
       me,
       employees,
       initializing,
@@ -122,6 +128,7 @@ export function AuthProvider({ children }) {
       principalType,
       username,
       role,
+      mustChangePassword,
       me,
       employees,
       initializing,

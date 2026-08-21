@@ -22,8 +22,9 @@ export default function ChangePassword() {
   const [saving, setSaving] = useState(false);
 
   const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const meetsComplexity = /(?=.*[A-Za-z])(?=.*\d).{8,}/.test(newPassword);
   const canSubmit =
-    currentPassword && newPassword.length >= 8 && newPassword === confirmPassword && !saving;
+    currentPassword && meetsComplexity && newPassword === confirmPassword && !saving;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -66,7 +67,8 @@ export default function ChangePassword() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                helperText="At least 8 characters"
+                error={newPassword.length > 0 && !meetsComplexity}
+                helperText="At least 8 characters, with a letter and a digit"
                 required
                 fullWidth
               />

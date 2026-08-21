@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LinearProgress from '@mui/material/LinearProgress';
 import AppLayout from './layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import RequireRole from './components/RequireRole';
+import { HR_ADMIN, SUP_HR_ADMIN, ADMIN_ONLY, PLATFORM_ONLY } from './layout/navConfig';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Auth/Login';
 import ChangePassword from './pages/Auth/ChangePassword';
@@ -95,102 +97,118 @@ function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/change-password" element={<ChangePassword />} />
 
-          <Route path="/masters" element={<MastersLayout />}>
-            <Route path="companies" element={<Companies />} />
-            <Route path="departments" element={<Departments />} />
-            <Route path="designations" element={<Designations />} />
-            <Route path="categories" element={<Categories />} />
-            <Route path="salary-rule" element={<SalaryRule />} />
-            <Route path="attendance-rule" element={<AttendanceRule />} />
-          </Route>
-
-          <Route path="/employees" element={<EmployeeList />} />
-          <Route path="/employees/new" element={<EmployeeForm />} />
-          <Route path="/employees/bulk-import" element={<BulkImportEmployees />} />
-          <Route path="/employees/:id/edit" element={<EmployeeForm />} />
-          <Route path="/employees/:id" element={<EmployeeDetail />} />
-          <Route path="/team" element={<MyTeam />} />
-
-          <Route path="/shifts" element={<ShiftList />} />
-
-          <Route path="/roster" element={<RosterLayout />}>
-            <Route index element={<Planner />} />
-            <Route path="planner" element={<Planner />} />
-            <Route path="bulk" element={<BulkAssign />} />
-            <Route path="csv-upload" element={<BulkImportCsv />} />
-            <Route path="auto-rotate" element={<AutoRotate />} />
-            <Route path="copy-month" element={<CopyMonth />} />
-            <Route path="swap" element={<Swap />} />
-          </Route>
-
-          <Route path="/holidays" element={<Holidays />} />
-
+          {/* Open to every authenticated role - self-service pages with no
+              navConfig visibleFor restriction of their own. */}
           <Route path="/attendance/me" element={<MyAttendance />} />
-          <Route path="/attendance" element={<AttendanceConsoleLayout />}>
-            <Route index element={<AttendanceGenerate />} />
-            <Route path="generate" element={<AttendanceGenerate />} />
-            <Route path="records" element={<AttendanceRecords />} />
-          </Route>
-
+          <Route path="/salary-slips/me" element={<MySalarySlip />} />
           <Route path="/leave" element={<LeaveLayout />}>
             <Route index element={<LeaveApply />} />
             <Route path="apply" element={<LeaveApply />} />
             <Route path="my" element={<MyLeaves />} />
-            <Route path="approvals" element={<PendingApprovals />} />
-            <Route path="all" element={<AllLeaves />} />
             <Route path="calendar" element={<LeaveCalendar />} />
             <Route path="balances" element={<LeaveBalances />} />
-          </Route>
-          <Route path="/leave/bulk-import" element={<BulkImportLeaves />} />
 
-          <Route path="/payroll" element={<PayrollLayout />}>
-            <Route index element={<PayrollGenerate />} />
-            <Route path="generate" element={<PayrollGenerate />} />
-            <Route path="generate-all" element={<PayrollGenerateAll />} />
-            <Route path="bulk-generate" element={<PayrollBulkGenerate />} />
-            <Route path="list" element={<PayrollList />} />
-            <Route path="history" element={<PayrollEmployeeHistory />} />
+            {/* Approving someone else's leave is a supervisor-and-up action. */}
+            <Route element={<RequireRole allow={SUP_HR_ADMIN} />}>
+              <Route path="approvals" element={<PendingApprovals />} />
+            </Route>
+            <Route element={<RequireRole allow={HR_ADMIN} />}>
+              <Route path="all" element={<AllLeaves />} />
+            </Route>
           </Route>
 
-          <Route path="/salary-slips/me" element={<MySalarySlip />} />
-          <Route path="/salary-slips" element={<SalarySlip />} />
+          <Route element={<RequireRole allow={SUP_HR_ADMIN} />}>
+            <Route path="/team" element={<MyTeam />} />
+            <Route path="/roster" element={<RosterLayout />}>
+              <Route index element={<Planner />} />
+              <Route path="planner" element={<Planner />} />
+              <Route path="bulk" element={<BulkAssign />} />
+              <Route path="csv-upload" element={<BulkImportCsv />} />
+              <Route path="auto-rotate" element={<AutoRotate />} />
+              <Route path="copy-month" element={<CopyMonth />} />
+              <Route path="swap" element={<Swap />} />
+            </Route>
+          </Route>
 
-          <Route path="/reports" element={<ReportsHub />} />
-          <Route path="/reports/employees" element={withSuspense(<EmployeesReport />)} />
-          <Route
-            path="/reports/attendance/monthly"
-            element={withSuspense(<AttendanceMonthlyReport />)}
-          />
-          <Route
-            path="/reports/attendance/late-coming"
-            element={withSuspense(<LateComingReport />)}
-          />
-          <Route path="/reports/attendance/absent" element={withSuspense(<AbsentReport />)} />
-          <Route path="/reports/attendance/overtime" element={withSuspense(<OvertimeReport />)} />
-          <Route path="/reports/attendance/lop" element={withSuspense(<LopReport />)} />
-          <Route path="/reports/leave-balances" element={withSuspense(<LeaveBalancesReport />)} />
-          <Route path="/reports/payroll" element={withSuspense(<PayrollReport />)} />
-          <Route
-            path="/reports/payroll/by-department"
-            element={withSuspense(<PayrollByDepartmentReport />)}
-          />
-          <Route
-            path="/reports/payroll/by-company"
-            element={withSuspense(<PayrollByCompanyReport />)}
-          />
-          <Route path="/reports/statutory/pf" element={withSuspense(<PfReport />)} />
-          <Route
-            path="/reports/statutory/professional-tax"
-            element={withSuspense(<ProfessionalTaxReport />)}
-          />
-          <Route path="/reports/statutory/esic" element={withSuspense(<EsicReport />)} />
+          <Route element={<RequireRole allow={HR_ADMIN} />}>
+            <Route path="/masters" element={<MastersLayout />}>
+              <Route path="companies" element={<Companies />} />
+              <Route path="departments" element={<Departments />} />
+              <Route path="designations" element={<Designations />} />
+              <Route path="categories" element={<Categories />} />
+              <Route path="salary-rule" element={<SalaryRule />} />
+              <Route path="attendance-rule" element={<AttendanceRule />} />
+            </Route>
 
-          <Route path="/roles" element={<RolesList />} />
-          <Route path="/roles/:id" element={<RoleDetail />} />
-          <Route path="/audit-logs" element={<AuditLog />} />
+            <Route path="/employees" element={<EmployeeList />} />
+            <Route path="/employees/new" element={<EmployeeForm />} />
+            <Route path="/employees/bulk-import" element={<BulkImportEmployees />} />
+            <Route path="/employees/:id/edit" element={<EmployeeForm />} />
+            <Route path="/employees/:id" element={<EmployeeDetail />} />
 
-          <Route path="/platform/companies" element={<Companies />} />
-          <Route path="/platform/onboard" element={<OnboardCompany />} />
+            <Route path="/shifts" element={<ShiftList />} />
+            <Route path="/holidays" element={<Holidays />} />
+
+            <Route path="/attendance" element={<AttendanceConsoleLayout />}>
+              <Route index element={<AttendanceGenerate />} />
+              <Route path="generate" element={<AttendanceGenerate />} />
+              <Route path="records" element={<AttendanceRecords />} />
+            </Route>
+
+            <Route path="/leave/bulk-import" element={<BulkImportLeaves />} />
+
+            <Route path="/payroll" element={<PayrollLayout />}>
+              <Route index element={<PayrollGenerate />} />
+              <Route path="generate" element={<PayrollGenerate />} />
+              <Route path="generate-all" element={<PayrollGenerateAll />} />
+              <Route path="bulk-generate" element={<PayrollBulkGenerate />} />
+              <Route path="list" element={<PayrollList />} />
+              <Route path="history" element={<PayrollEmployeeHistory />} />
+            </Route>
+
+            <Route path="/salary-slips" element={<SalarySlip />} />
+
+            <Route path="/reports" element={<ReportsHub />} />
+            <Route path="/reports/employees" element={withSuspense(<EmployeesReport />)} />
+            <Route
+              path="/reports/attendance/monthly"
+              element={withSuspense(<AttendanceMonthlyReport />)}
+            />
+            <Route
+              path="/reports/attendance/late-coming"
+              element={withSuspense(<LateComingReport />)}
+            />
+            <Route path="/reports/attendance/absent" element={withSuspense(<AbsentReport />)} />
+            <Route path="/reports/attendance/overtime" element={withSuspense(<OvertimeReport />)} />
+            <Route path="/reports/attendance/lop" element={withSuspense(<LopReport />)} />
+            <Route path="/reports/leave-balances" element={withSuspense(<LeaveBalancesReport />)} />
+            <Route path="/reports/payroll" element={withSuspense(<PayrollReport />)} />
+            <Route
+              path="/reports/payroll/by-department"
+              element={withSuspense(<PayrollByDepartmentReport />)}
+            />
+            <Route
+              path="/reports/payroll/by-company"
+              element={withSuspense(<PayrollByCompanyReport />)}
+            />
+            <Route path="/reports/statutory/pf" element={withSuspense(<PfReport />)} />
+            <Route
+              path="/reports/statutory/professional-tax"
+              element={withSuspense(<ProfessionalTaxReport />)}
+            />
+            <Route path="/reports/statutory/esic" element={withSuspense(<EsicReport />)} />
+          </Route>
+
+          <Route element={<RequireRole allow={ADMIN_ONLY} />}>
+            <Route path="/roles" element={<RolesList />} />
+            <Route path="/roles/:id" element={<RoleDetail />} />
+            <Route path="/audit-logs" element={<AuditLog />} />
+          </Route>
+
+          <Route element={<RequireRole allow={PLATFORM_ONLY} />}>
+            <Route path="/platform/companies" element={<Companies />} />
+            <Route path="/platform/onboard" element={<OnboardCompany />} />
+          </Route>
 
           <Route path="*" element={<NotFound />} />
         </Route>

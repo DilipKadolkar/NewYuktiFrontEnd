@@ -61,7 +61,7 @@ function PayrollReadiness({ debugRow }) {
   if (debugRow.ruleDrifted) {
     issues.push({
       title: 'The salary rule changed after this payroll was generated',
-      detail: `Basic+DA ${debugRow.storedRuleBasicDaPercent}% → ${debugRow.liveRuleBasicDaPercent}%, PF ${debugRow.storedRulePfPercent}% → ${debugRow.liveRulePfPercent}%, ESIC ${debugRow.storedRuleEsicPercent}% → ${debugRow.liveRuleEsicPercent}%.`,
+      detail: `Basic+DA ${debugRow.storedRuleBasicDaPercent}% → ${debugRow.liveRuleBasicDaPercent}%, PF ${debugRow.storedRulePfPercent}% → ${debugRow.liveRulePfPercent}%, ESIC ${debugRow.storedRuleEsicPercent}% → ${debugRow.liveRuleEsicPercent}%, day-wise days/month ${debugRow.storedRuleDayWiseDaysInMonth} → ${debugRow.liveRuleDayWiseDaysInMonth}, standard hours/day ${debugRow.storedRuleStandardHoursPerDay} → ${debugRow.liveRuleStandardHoursPerDay}, OT rate ${debugRow.storedRuleOvertimeRateMultiplier}x → ${debugRow.liveRuleOvertimeRateMultiplier}x.`,
     });
   }
   if (issues.length === 0) return null;

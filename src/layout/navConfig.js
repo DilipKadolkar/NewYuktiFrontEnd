@@ -14,9 +14,13 @@ import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import DomainAddRoundedIcon from '@mui/icons-material/DomainAddRounded';
 
-const HR_ADMIN = ['HR', 'ADMIN'];
-const SUP_HR_ADMIN = ['SUPERVISOR', 'HR', 'ADMIN'];
-const ADMIN_ONLY = ['ADMIN'];
+// Exported so RequireRole (route-level guarding, see App.js) reads the exact
+// same role lists as the sidebar's own visibility check - one source of truth
+// for "who can see this" instead of two lists that could drift apart.
+export const HR_ADMIN = ['HR', 'ADMIN'];
+export const SUP_HR_ADMIN = ['SUPERVISOR', 'HR', 'ADMIN'];
+export const ADMIN_ONLY = ['ADMIN'];
+export const PLATFORM_ONLY = ['PLATFORM_OWNER', 'PLATFORM_ADMIN'];
 
 const navConfig = [
   {
