@@ -5,6 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
 import ClearRoundedIcon from '@mui/icons-material/ClearRounded';
 import Alert from '@mui/material/Alert';
@@ -28,6 +29,7 @@ import EmployeePicker from '../../components/EmployeePicker';
 import attendanceApi from '../../api/attendance';
 import { ATTENDANCE_STATUS, ATTENDANCE_STATUS_COLOR } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { formatHours } from '../../utils/hours';
 import { useAuth } from '../../context/AuthContext';
 
 function CorrectionDialog({ open, record, userId, onClose, onSaved }) {
@@ -250,19 +252,22 @@ export default function Records() {
     },
     { field: 'shiftCode', headerName: 'Shift', width: 90 },
     {
+      // Date included, not just time - a night shift's lastOut (and sometimes
+      // firstIn) falls on the next calendar day, and "07:17" alone doesn't
+      // say which day that is.
       field: 'firstIn',
       headerName: 'In',
-      width: 130,
-      valueFormatter: (v) => (v ? dayjs(v).format('HH:mm') : '-'),
+      width: 150,
+      valueFormatter: (v) => (v ? dayjs(v).format('DD MMM, HH:mm') : '-'),
     },
     {
       field: 'lastOut',
       headerName: 'Out',
-      width: 130,
-      valueFormatter: (v) => (v ? dayjs(v).format('HH:mm') : '-'),
+      width: 150,
+      valueFormatter: (v) => (v ? dayjs(v).format('DD MMM, HH:mm') : '-'),
     },
-    { field: 'workingHours', headerName: 'Hours', width: 90 },
-    { field: 'overtimeHours', headerName: 'OT', width: 80 },
+    { field: 'workingHours', headerName: 'Hours', width: 90, valueFormatter: formatHours },
+    { field: 'overtimeHours', headerName: 'OT', width: 80, valueFormatter: formatHours },
     {
       field: 'status',
       headerName: 'Status',
@@ -273,13 +278,14 @@ export default function Records() {
       field: 'recordStatus',
       headerName: 'Source',
       width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          size="small"
-          color={params.value === 'MANUAL' ? 'secondary' : 'default'}
-        />
-      ),
+      renderCell: (params) =>
+        params.value && (
+          <Chip
+            label={params.value}
+            size="small"
+            color={params.value === 'MANUAL' ? 'secondary' : 'default'}
+          />
+        ),
     },
     {
       field: 'locked',
@@ -306,6 +312,14 @@ export default function Records() {
         ),
     },
   ];
+
+  // The month's total worked and overtime hours, summed from the same rows
+  // the table shows - lets HR see at a glance that it matches the monthly
+  // summary without adding the day rows up by hand. @mui/x-data-grid (no
+  // -pro license here) has no row-pinning/footer-aggregation of its own, so
+  // this renders as a line under the table instead of a row inside it.
+  const totalWorkingHours = rows.reduce((sum, r) => sum + Number(r.workingHours || 0), 0);
+  const totalOvertimeHours = rows.reduce((sum, r) => sum + Number(r.overtimeHours || 0), 0);
 
   return (
     <>
@@ -350,6 +364,19 @@ export default function Records() {
             </Alert>
           )}
           <DataTable rows={rows} columns={columns} loading={loading} height={560} density="compact" />
+          <Stack
+            direction="row"
+            spacing={3}
+            sx={{ mt: 1.5, px: 1 }}
+            data-testid="attendance-records-totals"
+          >
+            <Typography variant="body2" color="text.secondary">
+              Total hours: <strong>{formatHours(totalWorkingHours)}</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Total overtime: <strong>{formatHours(totalOvertimeHours)}</strong>
+            </Typography>
+          </Stack>
         </>
       )}
 

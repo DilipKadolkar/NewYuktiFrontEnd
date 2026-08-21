@@ -18,6 +18,7 @@ import EmployeePicker from '../../components/EmployeePicker';
 import attendanceApi from '../../api/attendance';
 import { ATTENDANCE_STATUS_COLOR } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { formatHours } from '../../utils/hours';
 
 const columns = [
   {
@@ -28,19 +29,21 @@ const columns = [
   },
   { field: 'shiftCode', headerName: 'Shift', width: 100 },
   {
+    // Date included, not just time - a night shift's lastOut (and sometimes
+    // firstIn) falls on the next calendar day.
     field: 'firstIn',
     headerName: 'In',
-    width: 130,
-    valueFormatter: (v) => (v ? dayjs(v).format('HH:mm') : '-'),
+    width: 150,
+    valueFormatter: (v) => (v ? dayjs(v).format('DD MMM, HH:mm') : '-'),
   },
   {
     field: 'lastOut',
     headerName: 'Out',
-    width: 130,
-    valueFormatter: (v) => (v ? dayjs(v).format('HH:mm') : '-'),
+    width: 150,
+    valueFormatter: (v) => (v ? dayjs(v).format('DD MMM, HH:mm') : '-'),
   },
-  { field: 'workingHours', headerName: 'Hours', width: 90 },
-  { field: 'overtimeHours', headerName: 'OT hrs', width: 90 },
+  { field: 'workingHours', headerName: 'Hours', width: 90, valueFormatter: formatHours },
+  { field: 'overtimeHours', headerName: 'OT hrs', width: 90, valueFormatter: formatHours },
   { field: 'lateMinutes', headerName: 'Late (min)', width: 100 },
   {
     field: 'status',
@@ -78,11 +81,12 @@ function DayRow({ day }) {
       </Box>
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
         <Typography variant="body2" className="tabular-nums" noWrap>
-          {day.firstIn ? dayjs(day.firstIn).format('HH:mm') : '—'} – {day.lastOut ? dayjs(day.lastOut).format('HH:mm') : '—'}
+          {day.firstIn ? dayjs(day.firstIn).format('DD MMM, HH:mm') : '—'} –{' '}
+          {day.lastOut ? dayjs(day.lastOut).format('DD MMM, HH:mm') : '—'}
         </Typography>
         {day.workingHours != null && (
           <Typography variant="caption" color="text.secondary">
-            {day.workingHours} hrs{day.overtimeHours > 0 ? ` · ${day.overtimeHours} OT` : ''}
+            {formatHours(day.workingHours)}{day.overtimeHours > 0 ? ` · ${formatHours(day.overtimeHours)} OT` : ''}
           </Typography>
         )}
       </Box>
@@ -252,7 +256,7 @@ export default function MyAttendance() {
               <StatCard loading={loading} label="Invalid punches" value={data?.invalidPunches} accent="error.main" />
             </Grid>
             <Grid size={{ xs: 6, sm: 3 }}>
-              <StatCard loading={loading} label="Overtime hours" value={data?.overtimeHours} accent="secondary.main" />
+              <StatCard loading={loading} label="Overtime hours" value={formatHours(data?.overtimeHours)} accent="secondary.main" />
             </Grid>
           </Grid>
           {data?.invalidPunches > 0 && (
@@ -273,6 +277,22 @@ export default function MyAttendance() {
                 height={480}
                 density="compact"
               />
+              {(data?.days || []).length > 0 && (
+                <Stack direction="row" spacing={3} sx={{ mt: 1.5, px: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Total hours:{' '}
+                    <strong>
+                      {formatHours((data?.days || []).reduce((sum, d) => sum + Number(d.workingHours || 0), 0))}
+                    </strong>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Total overtime:{' '}
+                    <strong>
+                      {formatHours((data?.days || []).reduce((sum, d) => sum + Number(d.overtimeHours || 0), 0))}
+                    </strong>
+                  </Typography>
+                </Stack>
+              )}
             </CardContent>
           </Card>
         </>
