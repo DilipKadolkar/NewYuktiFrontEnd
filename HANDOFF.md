@@ -3,7 +3,10 @@
 Built: 2026-08-05. Updated: 2026-08-09 (auth/roles/permissions catch-up),
 2026-08-16 (bulk employee onboarding: structure override, salary revision,
 credentials export — see §10), 2026-08-17 (employee Category master + Gender/
-UAN/ESIC/bank fields, Employee Master report full CSV export — see §14).
+UAN/ESIC/bank fields, Employee Master report full CSV export — see §14),
+2026-08-22 (bulk-import CSV header detection, DAY_WISE overtime/earn-wage/
+ESIC formula fixes, human-readable hours + totals in the attendance UI — see
+§15).
 GreyHR-style React frontend for the Accusharp HRMS Spring Boot backend. This doc
 is for whoever picks this up next — what's here, how it's wired, what's
 deliberately missing, and what to do first.
@@ -855,3 +858,140 @@ session. Whoever picks this up next should restart that backend (a plain
 rebuild is enough - `ddl-auto=update` adds the new `category` table and
 `employee` columns on its own) before clicking through Categories/the new
 employee fields for real.
+
+---
+
+## 15. Bulk-import CSV header detection, DAY_WISE payroll formula fixes, human-readable attendance hours (2026-08-22)
+
+A user reported the employee bulk-import template's downloaded `.xlsx`
+(§11b) failing to upload as CSV, then a string of DAY_WISE payroll numbers
+that didn't look right, then a request to make attendance hours readable in
+the UI. All from the same debugging session; grouped here as one dated entry.
+
+### 15a. Backend: bulk-import CSV header is no longer assumed to be line 1
+
+`§11b`'s styled `.xlsx` template puts a title, instructions and a legend
+above the real header row (row 6), with a trailing `" *"` on required-column
+headers. Excel's *Save As → CSV* carries those decorative rows into the file
+unchanged, so the resulting CSV's first line was literally `Employee Bulk
+Import Template,,,,,...` - `CsvRowParser` (shared by all four bulk-import
+CSV parsers) always trusted row 1 as the header and choked on it with
+`Malformed CSV header: ...`.
+
+`CsvRowParser.parse` (`Accusharp/src/main/java/com/accusharp/hrms/util/`)
+now takes a `headerHintColumn` - one of the caller's own required columns
+(`employeeCode`, `employeeId`, `shiftCode`, `leaveType` for the four
+parsers respectively) - scans for the first row containing it, and treats
+everything above as decoration to skip. The same pass strips the trailing
+`" *"` marker so required-column headers match by name. `EmployeeCsvParser`/
+`PayrollCsvParser`/`ShiftAssignmentCsvParser`/`LeaveCsvParser` each just pass
+their hint at the one call site. See `Accusharp/ARCHITECTURE.md`'s "Bulk /
+CSV mutation endpoints" section and `Accusharp/README.md` §3.4.2 for the
+corresponding doc updates.
+
+### 15b. Backend: DAY_WISE overtime is now measured against present days, with paid leave added on top
+
+`PayrollService.monthlyOvertimeHours` used a flat `dayWiseDaysInMonth x
+standardHoursPerDay` baseline (208h at the defaults) for every DAY_WISE
+employee regardless of attendance - someone present only 20 of 26 days still
+had 208h subtracted from their worked hours before anything counted as
+overtime, understating it by exactly `(26 - presentDays) x 8` hours.
+
+Went through two iterations in this session, worth recording since the
+first one looked plausible but had a real gap:
+
+1. First attempt: `effectiveDays = min(presentDays + paidLeaveDays, 26)`,
+   baseline = `effectiveDays x standardHoursPerDay`. This capped the
+   *combined* present+leave days at 26 before computing the baseline - but
+   since most DAY_WISE employees are already present close to 26 days, adding
+   leave on top almost always got clipped straight back down by the cap,
+   so paid leave ended up contributing nothing in the common case despite
+   being intended to count.
+2. Final: `overtimeHours = max(0, totalHours - min(presentDays,
+   dayWiseDaysInMonth) x standardHoursPerDay) + (paidLeaveDays x
+   standardHoursPerDay)` - present days alone (not present+leave) are capped
+   at the standard month for the worked-hours baseline, and paid leave hours
+   are added as a fully separate term afterward, so they're never at risk of
+   being absorbed by the cap.
+
+`Accusharp/src/test/java/com/accusharp/hrms/DayWisePayrollOvertimeTest.java`
+covers both the present-days-alone cap and the leave-added-on-top behavior
+with worked examples.
+
+### 15c. Backend: DAY_WISE payableDays (and the earn-wage lines it drives) no longer includes paid leave
+
+Same root cause as §15b playing out in a second place: `payableDays` for
+DAY_WISE was `min(presentDays + paidLeaveDays, dayWiseDaysInMonth)`, so paid
+leave contributed to `earnBasicDA`/`earnHra`/`earnConveyance`/
+`earnEducation`/`earnMedical`/`earnOther` (all prorated by `payableDays`) the
+same way a present day did. Changed to `payableDays = min(presentDays,
+dayWiseDaysInMonth)` - paid leave earns its own overtime credit (§15b) but no
+longer a share of the fixed salary structure. `Payroll.presentDays` itself
+(the stored/displayed field, not just the value used internally for
+`payableDays`) is now also capped at `dayWiseDaysInMonth` for DAY_WISE, so it
+can't show a number like `28` that the rest of the payslip never actually
+paid against.
+
+### 15d. Backend: ESIC now applies to earned basicDA, not earned gross
+
+`DeductionCalculationService.calculateEsic` took the full earned gross
+(`earnBasicDA + earnHra + earnConveyance + earnEducation + earnMedical +
+earnOther`) for both the 21,000 wage-ceiling test and the deduction
+percentage. Changed to take `payroll.getEarnBasicDA()` alone for both -
+applies to every employment status, not just DAY_WISE, since it's one shared
+function. `Accusharp/TESTING.md` and `Accusharp/WALKTHROUGH.md`'s worked
+payroll example (Priya Kulkarni, `EMP005`) had its `esic`/`totalDeduction`/
+`netSalary` figures (and everything that echoes them further down each doc -
+the salary slip, the CSV export, the regenerate/revision-history example)
+recomputed and corrected to match: `esic` goes from `0.00` to `93.60` since
+her earned `basicDA` (12480) is well under the ceiling even though her
+earned gross (22623) was already over it.
+
+`PayrollDebugRow`/`Payroll` gained three new stored-vs-live field pairs
+(`dayWiseDaysInMonth`, `standardHoursPerDay`, `overtimeRateMultiplier`) so
+`GET /api/payroll/debug` can flag drift on the rule inputs §15b-§15d's
+formulas actually depend on - previously only `basicDaPercent`/`pfPercent`/
+`esicPercent` were tracked, so a change to these three would have silently
+gone undetected by the one tool that exists to catch exactly this.
+`pages/Payroll/Generate.jsx`'s "salary rule changed" warning banner reports
+all three alongside the existing percentages.
+
+### 15e. Frontend: human-readable hours, dated in/out times, and a totals line on attendance screens
+
+New `utils/hours.js` (`formatHours`) converts a decimal-hours value (e.g.
+`11.80`, meaning 11h48m) into `"11h 48m"` - the raw decimal reads as if it
+could mean "11 hours 80 minutes," which it doesn't. Applied to
+`workingHours`/`overtimeHours`/`totalHours` wherever they're displayed:
+`pages/Attendance/Records.jsx` and `pages/Attendance/MyAttendance.jsx`
+(DataGrid columns, the mobile day-card view, and the "Overtime hours" stat
+card), and `pages/Reports/AttendanceMonthlyReport.jsx`. The underlying
+decimal value is untouched everywhere else (payroll math, sorting, CSV
+exports) - this is a display-only change.
+
+The same two pages' `firstIn`/`lastOut` columns now show the date alongside
+the time (`"DD MMM, HH:mm"` instead of bare `"HH:mm"`) - a night shift's
+`lastOut` (sometimes `firstIn` too) falls on the next calendar day, and a
+bare time doesn't say which day that is.
+
+Both pages also show a "Total hours" / "Total overtime" line under the
+day-by-day table, summed client-side from the same rows the table displays -
+lets HR (or the employee, on their own view) see at a glance that the sum
+matches the monthly summary without adding rows up by hand. First attempt
+used MUI DataGrid's `pinnedRows` prop for a true footer row inside the grid,
+then caught during review that `pinnedRows` is a `@mui/x-data-grid-pro`-only
+feature and this project only has the free `@mui/x-data-grid` installed - the
+prop would have been silently ignored, not crashed, so it was worth checking
+before shipping it. Switched to a plain summary line rendered below the
+table instead, which needs no extra dependency.
+
+### 15f. Verification
+
+Backend: `./mvnw test` - 164/164 passing, including the new/updated cases in
+`DayWisePayrollOvertimeTest` (4 cases) and a new
+`esicIsBasedOnEarnedBasicDaNotEarnedGross` case in
+`PayrollFlowIntegrationTest`. Frontend: dev server hot-reloaded the Records/
+MyAttendance changes with no console errors (checked via the already-running
+`npm start` instance rather than starting a second one). **Not done:**
+logging into the running app to click through the totals line and dated
+in/out columns for real - same credential constraint as every other section
+here; the user confirmed the hours-formatting change directly instead.
