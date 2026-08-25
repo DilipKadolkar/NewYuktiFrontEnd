@@ -3,22 +3,32 @@ import axios from 'axios';
 const client = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  // The refresh token is an httpOnly cookie now, so the browser has to be told
+  // to attach it. This does not widen what ordinary requests carry: the cookie
+  // is Path=/api/auth server-side, so business calls still send nothing extra.
+  withCredentials: true,
 });
 
-const STORAGE_KEY = 'accusharp.auth';
+// ---------------------------------------------------------------------------
+// Access token - held in memory, deliberately never in localStorage.
+//
+// Both tokens used to live in localStorage under 'accusharp.auth', which meant
+// a single XSS anywhere in this bundle handed an attacker a seven-day session
+// (the refresh token) on an app holding salary and bank data. The refresh token
+// is now an httpOnly cookie that JavaScript cannot read at all, and the access
+// token lives in this module variable: it dies with the tab, is never
+// serialised anywhere a script can enumerate, and is worth only 15 minutes even
+// if it is somehow read.
+//
+// Losing it on page refresh is not a regression - AuthContext silently
+// exchanges the cookie for a new one during boot, so the user stays signed in.
+// ---------------------------------------------------------------------------
+let accessToken = null;
 
-export const getStoredAuth = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
+export const getAccessToken = () => accessToken;
 
-export const setStoredAuth = (auth) => {
-  if (auth) localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-  else localStorage.removeItem(STORAGE_KEY);
+export const setAccessToken = (token) => {
+  accessToken = token ?? null;
 };
 
 let onError = null;
@@ -27,8 +37,9 @@ export const registerErrorHandler = (handler) => {
   onError = handler;
 };
 
-// Fired when a 401 survives a refresh attempt (or there's no refresh token to
-// try) - AuthContext registers this to clear its state and redirect to /login.
+// Fired when a 401 survives a refresh attempt (or there's no session to
+// refresh) - AuthContext registers this to clear its state and redirect to
+// /login.
 let onAuthExpired = null;
 
 export const registerAuthExpiredHandler = (handler) => {
@@ -39,27 +50,27 @@ const isAuthEndpoint = (url) =>
   typeof url === 'string' && (url.includes('/auth/login') || url.includes('/auth/refresh'));
 
 client.interceptors.request.use((config) => {
-  const stored = getStoredAuth();
-  if (stored?.accessToken) {
+  if (accessToken) {
     config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${stored.accessToken}`;
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
 
-// Shared in-flight refresh so concurrent 401s trigger exactly one /auth/refresh call.
+// Shared in-flight refresh so concurrent 401s trigger exactly one /auth/refresh
+// call.
 let refreshPromise = null;
 
+// Bare axios rather than `client`, so this call cannot recurse through the
+// response interceptor below. No body: the refresh token travels as a cookie,
+// which is the point - nothing here can read or forward it.
 const doRefresh = () => {
-  const stored = getStoredAuth();
-  if (!stored?.refreshToken) return Promise.reject(new Error('No refresh token available'));
   if (!refreshPromise) {
     refreshPromise = axios
-      .post('/api/auth/refresh', { refreshToken: stored.refreshToken })
+      .post('/api/auth/refresh', null, { withCredentials: true })
       .then((r) => {
-        const updated = { ...stored, ...r.data };
-        setStoredAuth(updated);
-        return updated;
+        setAccessToken(r.data.accessToken);
+        return r.data;
       })
       .finally(() => {
         refreshPromise = null;
@@ -67,6 +78,10 @@ const doRefresh = () => {
   }
   return refreshPromise;
 };
+
+// Exported so AuthContext can restore a session on boot using the same
+// single-flight path the interceptor uses.
+export const refreshSession = doRefresh;
 
 const normalizeError = (error) => {
   const apiError = error.response?.data;
@@ -100,7 +115,7 @@ client.interceptors.response.use(
           return client(original);
         })
         .catch(() => {
-          setStoredAuth(null);
+          setAccessToken(null);
           if (onAuthExpired) onAuthExpired();
           return Promise.reject({
             message: 'Your session has expired. Please sign in again.',

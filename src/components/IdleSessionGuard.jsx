@@ -18,12 +18,13 @@ const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const WARNING_BEFORE_MS = 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 5 * 1000;
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-// The auth token lives in localStorage, which is shared across every tab of
-// the same origin - so without this, one idle tab logging out would silently
-// clear the token (and revoke the refresh token server-side) out from under
-// a *different* tab the user is actively working in. Broadcasting activity
-// through a second localStorage key lets every tab's timer reset whenever
-// any tab sees real activity, the same way a proper single sign-out would.
+// The refresh token is an httpOnly cookie, which every tab of this origin
+// shares - so without this, one idle tab logging out would revoke the session
+// server-side out from under a *different* tab the user is actively working
+// in. Broadcasting activity through a localStorage key lets every tab's timer
+// reset whenever any tab sees real activity, the same way a proper single
+// sign-out would. Only a timestamp goes through this key; no credential has
+// been in web storage since the move to cookie-based sessions.
 const ACTIVITY_BROADCAST_KEY = 'accusharp.lastActivity';
 
 export default function IdleSessionGuard() {

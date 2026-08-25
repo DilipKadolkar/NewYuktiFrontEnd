@@ -2,22 +2,33 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useNavigate } from 'react-router-dom';
 import authApi from '../api/auth';
 import employeesApi from '../api/employees';
-import { getStoredAuth, setStoredAuth, registerAuthExpiredHandler } from '../api/client';
+import { setAccessToken, refreshSession, registerAuthExpiredHandler } from '../api/client';
 import { hasPermission } from '../constants/permissions';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
-  const [principalType, setPrincipalType] = useState(() => getStoredAuth()?.principalType || null);
-  const [username, setUsername] = useState(() => getStoredAuth()?.username || null);
-  const [role, setRole] = useState(() => getStoredAuth()?.role || null);
-  const [mustChangePassword, setMustChangePassword] = useState(
-    () => !!getStoredAuth()?.mustChangePassword
-  );
+  // Nothing is seeded from storage any more. Identity used to be read
+  // synchronously out of localStorage alongside the tokens; now the tokens are
+  // an httpOnly cookie plus an in-memory access token, so the session is
+  // re-established by asking the server on boot (see the hydrate effect below).
+  // That also means role and company can never be a stale copy the browser
+  // kept after they changed server-side.
+  const [principalType, setPrincipalType] = useState(null);
+  const [username, setUsername] = useState(null);
+  const [role, setRole] = useState(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [me, setMe] = useState(null);
   const [employees, setEmployees] = useState([]);
-  const [initializing, setInitializing] = useState(() => !!getStoredAuth()?.accessToken);
+  const [initializing, setInitializing] = useState(true);
+
+  const applySession = useCallback((session) => {
+    setPrincipalType(session.principalType);
+    setUsername(session.username);
+    setRole(session.role);
+    setMustChangePassword(!!session.mustChangePassword);
+  }, []);
 
   const loadProfile = useCallback((uname, ptype) => {
     if (ptype !== 'EMPLOYEE') {
@@ -43,7 +54,7 @@ export function AuthProvider({ children }) {
   }, [principalType]);
 
   const clearState = useCallback(() => {
-    setStoredAuth(null);
+    setAccessToken(null);
     setPrincipalType(null);
     setUsername(null);
     setRole(null);
@@ -52,14 +63,29 @@ export function AuthProvider({ children }) {
     setEmployees([]);
   }, []);
 
-  // Hydrate from localStorage once on mount (e.g. a page refresh).
+  // Restore the session on mount (first visit, page refresh, reopened tab).
+  // The refresh cookie is the only thing that survives a reload, so this is
+  // what turns it back into an access token. A visitor with no cookie - or a
+  // revoked or expired one - simply gets a 401 here and stays signed out; the
+  // call goes through bare axios, so that expected rejection never surfaces as
+  // an error toast.
   useEffect(() => {
-    const initial = getStoredAuth();
-    if (!initial?.accessToken) {
-      setInitializing(false);
-      return;
-    }
-    loadProfile(initial.username, initial.principalType).finally(() => setInitializing(false));
+    let cancelled = false;
+    refreshSession()
+      .then((session) => {
+        if (cancelled) return undefined;
+        applySession(session);
+        return loadProfile(session.username, session.principalType);
+      })
+      .catch(() => {
+        // No usable session. Not an error worth showing anyone.
+      })
+      .finally(() => {
+        if (!cancelled) setInitializing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,22 +100,25 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(
     (usernameInput, password) =>
+      // authApi.login puts the access token in memory itself; the refresh token
+      // arrives as a Set-Cookie this code never sees.
       authApi.login(usernameInput, password).then((res) => {
-        setStoredAuth(res);
-        setPrincipalType(res.principalType);
-        setUsername(res.username);
-        setRole(res.role);
-        setMustChangePassword(!!res.mustChangePassword);
+        applySession(res);
         return loadProfile(res.username, res.principalType).then(() => res);
       }),
-    [loadProfile]
+    [applySession, loadProfile]
   );
 
-  const logout = useCallback(() => {
-    const stored = getStoredAuth();
-    const done = stored?.refreshToken ? authApi.logout(stored.refreshToken).catch(() => {}) : Promise.resolve();
-    return done.finally(() => clearState());
-  }, [clearState]);
+  const logout = useCallback(
+    () =>
+      // Always clear locally, even if the server call fails - a network error
+      // must not leave the UI believing it is still signed in.
+      authApi
+        .logout()
+        .catch(() => {})
+        .finally(() => clearState()),
+    [clearState]
+  );
 
   const isPlatform = principalType === 'PLATFORM';
   const isAuthenticated = !!principalType && !!username;

@@ -1,0 +1,48 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # CI=true makes react-scripts treat lint warnings as errors, so this is
+      # the lint gate as well as the build.
+      - name: Build
+        run: CI=true INLINE_RUNTIME_CHUNK=false npm run build
+
+      # There are no frontend tests yet (see the implementation plan). Kept
+      # here, non-blocking, so the day the first one lands it is already wired
+      # in rather than needing someone to remember.
+      - name: Test
+        run: CI=true npm test -- --passWithNoTests --watchAll=false
+
+  audit:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # High and above blocks; moderate advisories in build-only tooling are
+      # too noisy to gate on and are reviewed rather than enforced.
+      - run: npm audit --audit-level=high
