@@ -62,12 +62,28 @@ function ShiftFormDialog({ open, editing, onClose, onSaved }) {
 
   const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
-  const isValid = form.shiftCode && form.shiftName && form.startTime && form.endTime && form.workingHours > 0;
-  // Mirrors the backend's Shift.crossesMidnight(): true when end is not
-  // strictly after start. Shown proactively, before saving, per the
-  // redesign brief's overnight-shift example - not just after the fact.
+  // Identical start and end times are rejected by the backend: the shift would
+  // silently become 24 hours long, and every day worked would book sixteen
+  // hours of overtime. Compared on the formatted values actually sent, so this
+  // agrees with the server rather than tripping over picker precision.
+  const sameTime =
+    form.startTime &&
+    form.endTime &&
+    form.startTime.format('HH:mm:ss') === form.endTime.format('HH:mm:ss');
+
+  const isValid =
+    form.shiftCode && form.shiftName && form.startTime && form.endTime
+    && form.workingHours > 0 && !sameTime;
+
+  // Mirrors the backend's Shift.crossesMidnight() for the times the backend
+  // actually accepts: end strictly before start. Equal times satisfy the
+  // backend's `!endTime.isAfter(startTime)` too, but they are a mistake rather
+  // than an overnight shift - saying "crosses midnight" there would confirm the
+  // very thing about to be rejected, so they are flagged separately below.
+  // Shown proactively, before saving, per the redesign brief's overnight-shift
+  // example - not just after the fact.
   const crossesMidnight =
-    form.startTime && form.endTime && !form.endTime.isAfter(form.startTime);
+    form.startTime && form.endTime && form.endTime.isBefore(form.startTime);
 
   const handleSubmit = () => {
     setSaving(true);
@@ -102,6 +118,12 @@ function ShiftFormDialog({ open, editing, onClose, onSaved }) {
         {warnings.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }} onClose={() => { setWarnings([]); onSaved(); onClose(); }}>
             {warnings.join(' ')}
+          </Alert>
+        )}
+        {warnings.length === 0 && sameTime && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Start and end times are identical, so this shift would span a full 24 hours. For an
+            overnight shift set an end time earlier than the start — for example 18:00 to 08:00.
           </Alert>
         )}
         {warnings.length === 0 && crossesMidnight && (

@@ -44,6 +44,36 @@ const employees = {
       .post('/employees/bulk-import', formData, { headers: { 'Content-Type': undefined } })
       .then((r) => r.data);
   },
+
+  // CSV bulk salary revision, one row per employee. Payroll reconstructs which
+  // gross salary applied on which day from these rows, so `dryRun` costs the
+  // whole file and writes nothing - the way a file that reprices a company
+  // should be read before it is committed.
+  bulkSalaryRevision: (file, dryRun = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/employees/bulk-salary-revision', formData, {
+        params: { dryRun },
+        headers: { 'Content-Type': undefined },
+      })
+      .then((r) => r.data);
+  },
+
+  // CSV bulk salary-structure override. Freezes the four components for each
+  // employee in the file: from then on they no longer follow gross salary, and
+  // every future revision has to restate all four. `dryRun` costs the file and
+  // writes nothing.
+  bulkSalaryStructure: (file, dryRun = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/employees/bulk-salary-structure', formData, {
+        params: { dryRun },
+        headers: { 'Content-Type': undefined },
+      })
+      .then((r) => r.data);
+  },
 };
 
 export default employees;

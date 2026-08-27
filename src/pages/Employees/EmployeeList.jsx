@@ -152,6 +152,20 @@ export default function EmployeeList() {
                 Bulk Import
               </Button>
               <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => navigate('/employees/bulk-salary-revision')}
+              >
+                Bulk Salary Revision
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => navigate('/employees/bulk-salary-structure')}
+              >
+                Bulk Salary Structure
+              </Button>
+              <Button
                 variant="contained"
                 startIcon={<AddRoundedIcon />}
                 onClick={() => navigate('/employees/new')}

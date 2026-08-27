@@ -22,6 +22,8 @@ import EmployeeForm from './pages/Employees/EmployeeForm';
 import EmployeeDetail from './pages/Employees/EmployeeDetail';
 import MyTeam from './pages/Employees/MyTeam';
 import BulkImportEmployees from './pages/Employees/BulkImportEmployees';
+import BulkSalaryRevision from './pages/Employees/BulkSalaryRevision';
+import BulkSalaryStructure from './pages/Employees/BulkSalaryStructure';
 import ShiftList from './pages/Shifts/ShiftList';
 import RosterLayout from './pages/Roster/RosterLayout';
 import Planner from './pages/Roster/Planner';
@@ -160,6 +162,8 @@ function App() {
             <Route path="/employees" element={<EmployeeList />} />
             <Route path="/employees/new" element={<EmployeeForm />} />
             <Route path="/employees/bulk-import" element={<BulkImportEmployees />} />
+            <Route path="/employees/bulk-salary-revision" element={<BulkSalaryRevision />} />
+            <Route path="/employees/bulk-salary-structure" element={<BulkSalaryStructure />} />
             <Route path="/employees/:id/edit" element={<EmployeeForm />} />
             <Route path="/employees/:id" element={<EmployeeDetail />} />
 
