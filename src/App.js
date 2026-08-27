@@ -56,9 +56,10 @@ import RolesList from './pages/Roles/RolesList';
 import RoleDetail from './pages/Roles/RoleDetail';
 import AuditLog from './pages/AuditLog/AuditLog';
 import OnboardCompany from './pages/Platform/OnboardCompany';
-// The 13 concrete report pages are lazy-loaded - HANDOFF.md's own flagged
-// best code-splitting candidate: rarely all used in one session, and each
-// pulls in DataGrid column defs that don't need to sit in the main bundle.
+// Every concrete report page is lazy-loaded - HANDOFF.md's own flagged best
+// code-splitting candidate: rarely all used in one session, and each pulls in
+// DataGrid column defs that don't need to sit in the main bundle. That matters
+// more now than it did at thirteen pages.
 const EmployeesReport = lazy(() => import('./pages/Reports/EmployeesReport'));
 const AttendanceMonthlyReport = lazy(() => import('./pages/Reports/AttendanceMonthlyReport'));
 const LateComingReport = lazy(() => import('./pages/Reports/LateComingReport'));
@@ -72,6 +73,22 @@ const PayrollByCompanyReport = lazy(() => import('./pages/Reports/PayrollByCompa
 const PfReport = lazy(() => import('./pages/Reports/PfReport'));
 const ProfessionalTaxReport = lazy(() => import('./pages/Reports/ProfessionalTaxReport'));
 const EsicReport = lazy(() => import('./pages/Reports/EsicReport'));
+const PayrollAuditReport = lazy(() => import('./pages/Reports/PayrollAuditReport'));
+const PayrollRegisterReport = lazy(() => import('./pages/Reports/PayrollRegisterReport'));
+const PayslipRegisterReport = lazy(() => import('./pages/Reports/PayslipRegisterReport'));
+const SalaryRevisionReport = lazy(() => import('./pages/Reports/SalaryRevisionReport'));
+const BankTransferReport = lazy(() => import('./pages/Reports/BankTransferReport'));
+const FullAndFinalReport = lazy(() => import('./pages/Reports/FullAndFinalReport'));
+const AttendanceExceptionReport = lazy(() => import('./pages/Reports/AttendanceExceptionReport'));
+const OvertimeRegisterReport = lazy(() => import('./pages/Reports/OvertimeRegisterReport'));
+const LeaveTransactionReport = lazy(() => import('./pages/Reports/LeaveTransactionReport'));
+const PfEcrReport = lazy(() => import('./pages/Reports/PfEcrReport'));
+const EsiReturnReport = lazy(() => import('./pages/Reports/EsiReturnReport'));
+const ProfessionalTaxRegisterReport = lazy(() =>
+  import('./pages/Reports/ProfessionalTaxRegisterReport')
+);
+const Tds24qReport = lazy(() => import('./pages/Reports/Tds24qReport'));
+const GratuityAccrualReport = lazy(() => import('./pages/Reports/GratuityAccrualReport'));
 
 // Plain EMPLOYEE lacks DASHBOARD_READ (see PermissionSeeder) and would 403 on
 // the dashboard's data calls; PLATFORM principals have no company dashboard
@@ -197,6 +214,52 @@ function App() {
               element={withSuspense(<ProfessionalTaxReport />)}
             />
             <Route path="/reports/statutory/esic" element={withSuspense(<EsicReport />)} />
+
+            {/* Monthly payroll audit and the greytHR-parity registers. */}
+            <Route path="/reports/payroll/audit" element={withSuspense(<PayrollAuditReport />)} />
+            <Route path="/reports/payroll/register" element={withSuspense(<PayrollRegisterReport />)} />
+            <Route
+              path="/reports/payroll/payslip-register"
+              element={withSuspense(<PayslipRegisterReport />)}
+            />
+            <Route
+              path="/reports/payroll/salary-revisions"
+              element={withSuspense(<SalaryRevisionReport />)}
+            />
+            <Route
+              path="/reports/payroll/bank-transfer"
+              element={withSuspense(<BankTransferReport />)}
+            />
+            <Route
+              path="/reports/payroll/full-and-final"
+              element={withSuspense(<FullAndFinalReport />)}
+            />
+            <Route
+              path="/reports/attendance/exceptions"
+              element={withSuspense(<AttendanceExceptionReport />)}
+            />
+            <Route
+              path="/reports/attendance/overtime-register"
+              element={withSuspense(<OvertimeRegisterReport />)}
+            />
+            <Route
+              path="/reports/leave/transactions"
+              element={withSuspense(<LeaveTransactionReport />)}
+            />
+            <Route path="/reports/statutory/pf-ecr" element={withSuspense(<PfEcrReport />)} />
+            <Route
+              path="/reports/statutory/esi-return"
+              element={withSuspense(<EsiReturnReport />)}
+            />
+            <Route
+              path="/reports/statutory/pt-register"
+              element={withSuspense(<ProfessionalTaxRegisterReport />)}
+            />
+            <Route path="/reports/statutory/tds-24q" element={withSuspense(<Tds24qReport />)} />
+            <Route
+              path="/reports/statutory/gratuity"
+              element={withSuspense(<GratuityAccrualReport />)}
+            />
           </Route>
 
           <Route element={<RequireRole allow={ADMIN_ONLY} />}>
