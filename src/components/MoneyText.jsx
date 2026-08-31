@@ -11,6 +11,10 @@ export function formatMoney(value) {
   return formatter.format(num);
 }
 
-export default function MoneyText({ value }) {
-  return <span>{formatMoney(value)}</span>;
+export default function MoneyText({ value, className = '', ...rest }) {
+  return (
+    <span className={`tabular-nums ${className}`.trim()} {...rest}>
+      {formatMoney(value)}
+    </span>
+  );
 }

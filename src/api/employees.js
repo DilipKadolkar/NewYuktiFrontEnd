@@ -25,6 +25,55 @@ const employees = {
   // Same regeneration for every non-overridden employee in the company; returns { regenerated: n }.
   regenerateAllSalaryStructures: () =>
     client.post('/employees/salary-structure/regenerate-all').then((r) => r.data),
+  // Hike/promotion/correction: updates grossSalary and re-derives basicDA/hra/conveyanceAllowance/
+  // educationAllowance from the current SalaryRule - unless the employee is overridden, in which
+  // case the payload must also carry those four replacement values (a frozen structure never
+  // follows grossSalary on its own). Always logs a SalaryRevision row, unlike a plain update().
+  reviseSalary: (id, payload) =>
+    client.post(`/employees/${id}/salary-revision`, payload).then((r) => r.data),
+  // Full history for one employee, newest effectiveDate first.
+  getSalaryRevisions: (id) => client.get(`/employees/${id}/salary-revisions`).then((r) => r.data),
+  // CSV bulk onboarding, one row per employee - same create() path per row, so a bad
+  // row never blocks the rest of the file. Returns BulkImportResult<{employee, temporaryPassword}>.
+  // 'Content-Type': undefined lets the browser set multipart/form-data with its boundary -
+  // client.js's default 'application/json' header would otherwise make axios JSON-encode the FormData.
+  bulkImport: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/employees/bulk-import', formData, { headers: { 'Content-Type': undefined } })
+      .then((r) => r.data);
+  },
+
+  // CSV bulk salary revision, one row per employee. Payroll reconstructs which
+  // gross salary applied on which day from these rows, so `dryRun` costs the
+  // whole file and writes nothing - the way a file that reprices a company
+  // should be read before it is committed.
+  bulkSalaryRevision: (file, dryRun = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/employees/bulk-salary-revision', formData, {
+        params: { dryRun },
+        headers: { 'Content-Type': undefined },
+      })
+      .then((r) => r.data);
+  },
+
+  // CSV bulk salary-structure override. Freezes the four components for each
+  // employee in the file: from then on they no longer follow gross salary, and
+  // every future revision has to restate all four. `dryRun` costs the file and
+  // writes nothing.
+  bulkSalaryStructure: (file, dryRun = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return client
+      .post('/employees/bulk-salary-structure', formData, {
+        params: { dryRun },
+        headers: { 'Content-Type': undefined },
+      })
+      .then((r) => r.data);
+  },
 };
 
 export default employees;

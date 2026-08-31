@@ -1,5 +1,7 @@
 export const EMPLOYEE_STATUS = ['PERMANENT', 'DAY_WISE', 'CONTRACT', 'INTERN'];
 
+export const GENDER = ['MALE', 'FEMALE'];
+
 export const ROLE = ['ADMIN', 'HR', 'SUPERVISOR', 'EMPLOYEE'];
 
 export const RECORD_STATUS = ['ACTIVE', 'INACTIVE'];
@@ -21,6 +23,8 @@ export const ATTENDANCE_STATUS = [
 ];
 
 export const PAYROLL_STATUS = ['GENERATED', 'SUPERSEDED'];
+
+export const SALARY_REVISION_REASON = ['ANNUAL_INCREMENT', 'PROMOTION', 'MARKET_CORRECTION', 'OTHER'];
 
 export const DAYS_OF_WEEK = [
   'MONDAY',

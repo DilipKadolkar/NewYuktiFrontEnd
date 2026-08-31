@@ -125,7 +125,23 @@ export default function MasterCrudPage({
           )
         }
       />
-      <DataTable rows={rows} columns={gridColumns} loading={loading} height={520} />
+      <DataTable
+        rows={rows}
+        columns={gridColumns}
+        loading={loading}
+        height={520}
+        emptyState={{
+          title: `No ${entityLabel.toLowerCase()}s yet`,
+          description: readOnly
+            ? `No ${entityLabel.toLowerCase()}s have been added yet.`
+            : `Add a ${entityLabel.toLowerCase()} to get started.`,
+          action: !readOnly && (
+            <Button size="small" variant="contained" onClick={openCreate}>
+              Add {entityLabel}
+            </Button>
+          ),
+        }}
+      />
 
       {!readOnly && (
         <>
@@ -143,7 +159,7 @@ export default function MasterCrudPage({
             open={!!deleteTarget}
             title={`Delete ${entityLabel}?`}
             description={`This will permanently remove "${
-              deleteTarget?.companyName || deleteTarget?.departmentName || deleteTarget?.designationName || deleteTarget?.shiftName || ''
+              deleteTarget?.companyName || deleteTarget?.departmentName || deleteTarget?.designationName || deleteTarget?.categoryName || deleteTarget?.shiftName || ''
             }". This cannot be undone.`}
             confirmLabel="Delete"
             confirmColor="error"

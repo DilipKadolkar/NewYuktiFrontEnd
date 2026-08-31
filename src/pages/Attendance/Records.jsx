@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import Button from '@mui/material/Button';
-import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
+import ClearRoundedIcon from '@mui/icons-material/ClearRounded';
 import Alert from '@mui/material/Alert';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -26,39 +29,43 @@ import EmployeePicker from '../../components/EmployeePicker';
 import attendanceApi from '../../api/attendance';
 import { ATTENDANCE_STATUS, ATTENDANCE_STATUS_COLOR } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { formatHours } from '../../utils/hours';
+import { useAuth } from '../../context/AuthContext';
 
 function CorrectionDialog({ open, record, userId, onClose, onSaved }) {
   const { enqueueSnackbar } = useSnackbar();
   const { actingAs } = useActingAs();
-  const [mode, setMode] = useState('times');
   const [firstIn, setFirstIn] = useState(null);
   const [lastOut, setLastOut] = useState(null);
-  const [status, setStatus] = useState('PRESENT');
+  const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open || !record) return;
-    setMode('times');
-    setFirstIn(record.firstIn ? dayjs(record.firstIn) : dayjs(record.attendanceDate));
-    setLastOut(record.lastOut ? dayjs(record.lastOut) : dayjs(record.attendanceDate));
-    setStatus(record.status || 'PRESENT');
+    setFirstIn(record.firstIn ? dayjs(record.firstIn) : null);
+    setLastOut(record.lastOut ? dayjs(record.lastOut) : null);
+    setStatus('');
     setRemarks('');
   }, [open, record]);
 
-  const isValid = remarks.trim().length > 0 && (mode === 'times' ? firstIn && lastOut : !!status);
+  // Mirrors the backend's own rule (AttendanceCorrectionRequest): both times together,
+  // or neither - a lone firstIn/lastOut would be silently dropped server-side otherwise.
+  const bothTimesGiven = !!firstIn && !!lastOut;
+  const noTimesGiven = !firstIn && !lastOut;
+  const timesConsistent = noTimesGiven || (bothTimesGiven && lastOut.isAfter(firstIn));
+  const isValid = remarks.trim().length > 0 && timesConsistent && (bothTimesGiven || !!status);
 
   const handleSubmit = () => {
     setSaving(true);
-    const payload =
-      mode === 'times'
-        ? {
-            firstIn: firstIn.format('YYYY-MM-DDTHH:mm:ss'),
-            lastOut: lastOut.format('YYYY-MM-DDTHH:mm:ss'),
-            remarks,
-            updatedBy: actingAs?.userId,
-          }
-        : { status, remarks, updatedBy: actingAs?.userId };
+    const payload = { remarks, updatedBy: actingAs?.userId };
+    if (bothTimesGiven) {
+      payload.firstIn = firstIn.format('YYYY-MM-DDTHH:mm:ss');
+      payload.lastOut = lastOut.format('YYYY-MM-DDTHH:mm:ss');
+    }
+    if (status) {
+      payload.status = status;
+    }
     attendanceApi
       .correct(userId, record.attendanceDate, payload)
       .then(() => {
@@ -76,53 +83,90 @@ function CorrectionDialog({ open, record, userId, onClose, onSaved }) {
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Correct {dayjs(record.attendanceDate).format('DD MMM YYYY')}</DialogTitle>
       <DialogContent>
-        <Stack direction="row" spacing={1} sx={{ mb: 2, mt: 0.5 }}>
-          <Chip
-            label="Supply times"
-            color={mode === 'times' ? 'primary' : 'default'}
-            onClick={() => setMode('times')}
-          />
-          <Chip
-            label="Declare status"
-            color={mode === 'status' ? 'primary' : 'default'}
-            onClick={() => setMode('status')}
-          />
-        </Stack>
-        {mode === 'times' ? (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <DateTimePicker
-                label="First in"
-                value={firstIn}
-                onChange={setFirstIn}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <DateTimePicker
-                label="Last out"
-                value={lastOut}
-                onChange={setLastOut}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </Grid>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Supply the real punch times, declare a status outright, or both - an explicit status
+          always labels the day, but hours/overtime are only ever computed from real times.
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <DateTimePicker
+              label="First in"
+              value={firstIn}
+              onChange={setFirstIn}
+              slotProps={{
+                textField: {
+                  size: 'small',
+                  fullWidth: true,
+                  InputProps: firstIn
+                    ? {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton size="small" onClick={() => setFirstIn(null)} edge="end">
+                              <ClearRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }
+                    : undefined,
+                },
+              }}
+            />
           </Grid>
-        ) : (
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            {ATTENDANCE_STATUS.map((s) => (
-              <MenuItem key={s} value={s}>
-                {s}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <DateTimePicker
+              label="Last out"
+              value={lastOut}
+              onChange={setLastOut}
+              slotProps={{
+                textField: {
+                  size: 'small',
+                  fullWidth: true,
+                  InputProps: lastOut
+                    ? {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton size="small" onClick={() => setLastOut(null)} edge="end">
+                              <ClearRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }
+                    : undefined,
+                },
+              }}
+            />
+          </Grid>
+        </Grid>
+        {!timesConsistent && (
+          <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+            {noTimesGiven || bothTimesGiven
+              ? 'Last out must be after first in.'
+              : 'Provide both first in and last out, or clear both and declare a status instead.'}
+          </Typography>
         )}
+        <TextField
+          select
+          fullWidth
+          size="small"
+          label={bothTimesGiven ? 'Declare status (optional override)' : 'Declare status'}
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          helperText={
+            bothTimesGiven
+              ? 'Leave unset to let the status follow the times above.'
+              : 'Required when no punch times are supplied - hours will follow the shift, not real punches.'
+          }
+          sx={{ mt: 2 }}
+        >
+          <MenuItem value="">
+            <em>{bothTimesGiven ? 'No override - use computed status' : 'Select a status'}</em>
+          </MenuItem>
+          {ATTENDANCE_STATUS.map((s) => (
+            <MenuItem key={s} value={s}>
+              {s}
+            </MenuItem>
+          ))}
+        </TextField>
         <TextField
           fullWidth
           size="small"
@@ -150,6 +194,10 @@ function CorrectionDialog({ open, record, userId, onClose, onSaved }) {
 export default function Records() {
   const { enqueueSnackbar } = useSnackbar();
   const { actingAs } = useActingAs();
+  const { can } = useAuth();
+  const canCorrect = can('ATTENDANCE_CORRECT');
+  const canUnlock = can('ATTENDANCE_UNLOCK');
+  const canGenerate = can('ATTENDANCE_GENERATE');
   const [userId, setUserId] = useState(null);
   const [month, setMonth] = useState(dayjs());
   const [rows, setRows] = useState([]);
@@ -204,19 +252,22 @@ export default function Records() {
     },
     { field: 'shiftCode', headerName: 'Shift', width: 90 },
     {
+      // Date included, not just time - a night shift's lastOut (and sometimes
+      // firstIn) falls on the next calendar day, and "07:17" alone doesn't
+      // say which day that is.
       field: 'firstIn',
       headerName: 'In',
-      width: 130,
-      valueFormatter: (v) => (v ? dayjs(v).format('HH:mm') : '-'),
+      width: 150,
+      valueFormatter: (v) => (v ? dayjs(v).format('DD MMM, HH:mm') : '-'),
     },
     {
       field: 'lastOut',
       headerName: 'Out',
-      width: 130,
-      valueFormatter: (v) => (v ? dayjs(v).format('HH:mm') : '-'),
+      width: 150,
+      valueFormatter: (v) => (v ? dayjs(v).format('DD MMM, HH:mm') : '-'),
     },
-    { field: 'workingHours', headerName: 'Hours', width: 90 },
-    { field: 'overtimeHours', headerName: 'OT', width: 80 },
+    { field: 'workingHours', headerName: 'Hours', width: 90, valueFormatter: formatHours },
+    { field: 'overtimeHours', headerName: 'OT', width: 80, valueFormatter: formatHours },
     {
       field: 'status',
       headerName: 'Status',
@@ -227,13 +278,14 @@ export default function Records() {
       field: 'recordStatus',
       headerName: 'Source',
       width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          size="small"
-          color={params.value === 'MANUAL' ? 'secondary' : 'default'}
-        />
-      ),
+      renderCell: (params) =>
+        params.value && (
+          <Chip
+            label={params.value}
+            size="small"
+            color={params.value === 'MANUAL' ? 'secondary' : 'default'}
+          />
+        ),
     },
     {
       field: 'locked',
@@ -248,17 +300,26 @@ export default function Records() {
       sortable: false,
       filterable: false,
       width: 70,
-      renderCell: (params) => (
-        <Tooltip title={params.row.locked ? 'Unlock the month first' : 'Correct'}>
-          <span>
-            <IconButton size="small" disabled={params.row.locked} onClick={() => setCorrecting(params.row)}>
-              <EditRoundedIcon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-      ),
+      renderCell: (params) =>
+        canCorrect && (
+          <Tooltip title={params.row.locked ? 'Unlock the month first' : 'Correct'}>
+            <span>
+              <IconButton size="small" disabled={params.row.locked} onClick={() => setCorrecting(params.row)}>
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        ),
     },
   ];
+
+  // The month's total worked and overtime hours, summed from the same rows
+  // the table shows - lets HR see at a glance that it matches the monthly
+  // summary without adding the day rows up by hand. @mui/x-data-grid (no
+  // -pro license here) has no row-pinning/footer-aggregation of its own, so
+  // this renders as a line under the table instead of a row inside it.
+  const totalWorkingHours = rows.reduce((sum, r) => sum + Number(r.workingHours || 0), 0);
+  const totalOvertimeHours = rows.reduce((sum, r) => sum + Number(r.overtimeHours || 0), 0);
 
   return (
     <>
@@ -275,12 +336,16 @@ export default function Records() {
               onChange={setMonth}
               slotProps={{ textField: { size: 'small' } }}
             />
-            <Button startIcon={<LockOpenRoundedIcon />} onClick={handleUnlock} disabled={!userId || busy}>
-              Unlock month
-            </Button>
-            <Button startIcon={<RefreshRoundedIcon />} onClick={handleRefresh} disabled={busy}>
-              Refresh summaries
-            </Button>
+            {canUnlock && (
+              <Button startIcon={<LockOpenRoundedIcon />} onClick={handleUnlock} disabled={!userId || busy}>
+                Unlock month
+              </Button>
+            )}
+            {canGenerate && (
+              <Button startIcon={<RefreshRoundedIcon />} onClick={handleRefresh} disabled={busy}>
+                Refresh summaries
+              </Button>
+            )}
           </>
         }
       />
@@ -291,7 +356,28 @@ export default function Records() {
           No records for this month yet — generate attendance first from the Generate tab.
         </Alert>
       ) : (
-        <DataTable rows={rows} columns={columns} loading={loading} height={560} density="compact" />
+        <>
+          {rows.filter((r) => r.status === 'INVALID_PUNCH').length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }} data-testid="attendance-warning">
+              {rows.filter((r) => r.status === 'INVALID_PUNCH').length} day(s) have a single punch
+              only — correct them below before payroll is generated.
+            </Alert>
+          )}
+          <DataTable rows={rows} columns={columns} loading={loading} height={560} density="compact" />
+          <Stack
+            direction="row"
+            spacing={3}
+            sx={{ mt: 1.5, px: 1 }}
+            data-testid="attendance-records-totals"
+          >
+            <Typography variant="body2" color="text.secondary">
+              Total hours: <strong>{formatHours(totalWorkingHours)}</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Total overtime: <strong>{formatHours(totalOvertimeHours)}</strong>
+            </Typography>
+          </Stack>
+        </>
       )}
 
       <CorrectionDialog

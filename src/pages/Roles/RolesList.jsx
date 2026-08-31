@@ -17,10 +17,14 @@ import PageHeader from '../../components/PageHeader';
 import DataTable from '../../components/DataTable';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import customRolesApi from '../../api/customRoles';
+import { useAuth } from '../../context/AuthContext';
 
 export default function RolesList() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
+  const { can } = useAuth();
+  const canManage = can('ROLE_MANAGE');
+  const canRead = can('ROLE_READ') || canManage;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -88,16 +92,20 @@ export default function RolesList() {
       width: 100,
       renderCell: (params) => (
         <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Manage permissions">
-            <IconButton size="small" onClick={() => navigate(`/roles/${params.row.id}`)}>
-              <TuneRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete">
-            <IconButton size="small" onClick={() => setDeleteTarget(params.row)}>
-              <DeleteRoundedIcon fontSize="small" color="error" />
-            </IconButton>
-          </Tooltip>
+          {canRead && (
+            <Tooltip title={canManage ? 'Manage permissions' : 'View permissions'}>
+              <IconButton size="small" onClick={() => navigate(`/roles/${params.row.id}`)}>
+                <TuneRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canManage && (
+            <Tooltip title="Delete">
+              <IconButton size="small" onClick={() => setDeleteTarget(params.row)}>
+                <DeleteRoundedIcon fontSize="small" color="error" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Stack>
       ),
     },
@@ -109,13 +117,31 @@ export default function RolesList() {
         title="Custom Roles"
         subtitle="Company-defined roles, additive on top of each employee's fixed role (ADMIN/HR/SUPERVISOR/EMPLOYEE)."
         actions={
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setFormOpen(true)}>
-            New role
-          </Button>
+          canManage && (
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setFormOpen(true)}>
+              New role
+            </Button>
+          )
         }
       />
 
-      <DataTable rows={rows} columns={columns} loading={loading} height={520} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={520}
+        emptyState={{
+          title: 'No custom roles yet',
+          description: canManage
+            ? 'Create a custom role to grant a specific set of permissions beyond an employee’s fixed role.'
+            : 'No custom roles have been created for this company yet.',
+          action: canManage && (
+            <Button size="small" variant="contained" onClick={() => setFormOpen(true)}>
+              New role
+            </Button>
+          ),
+        }}
+      />
 
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>New custom role</DialogTitle>

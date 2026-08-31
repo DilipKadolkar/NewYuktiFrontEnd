@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import PersonOffRoundedIcon from '@mui/icons-material/PersonOffRounded';
@@ -18,11 +19,16 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import employeesApi from '../../api/employees';
 import { RECORD_STATUS_COLOR, ROLE_COLOR, labelize } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function EmployeeList() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const { reloadEmployees } = useActingAs();
+  const { can } = useAuth();
+  const canCreate = can('EMPLOYEE_CREATE');
+  const canUpdate = can('EMPLOYEE_UPDATE');
+  const canDelete = can('EMPLOYEE_DELETE');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -83,6 +89,7 @@ export default function EmployeeList() {
     { field: 'userId', headerName: 'User ID', width: 110 },
     { field: 'departmentName', headerName: 'Department', width: 150 },
     { field: 'designationName', headerName: 'Designation', width: 160 },
+    { field: 'categoryName', headerName: 'Category', width: 130 },
     { field: 'supervisorName', headerName: 'Supervisor', width: 150 },
     {
       field: 'role',
@@ -110,16 +117,20 @@ export default function EmployeeList() {
               <VisibilityRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Edit">
-            <IconButton size="small" onClick={() => navigate(`/employees/${params.row.id}/edit`)}>
-              <EditRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Deactivate">
-            <IconButton size="small" onClick={() => setDeactivateTarget(params.row)}>
-              <PersonOffRoundedIcon fontSize="small" color="error" />
-            </IconButton>
-          </Tooltip>
+          {canUpdate && (
+            <Tooltip title="Edit">
+              <IconButton size="small" onClick={() => navigate(`/employees/${params.row.id}/edit`)}>
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canDelete && (
+            <Tooltip title="Deactivate">
+              <IconButton size="small" onClick={() => setDeactivateTarget(params.row)}>
+                <PersonOffRoundedIcon fontSize="small" color="error" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Stack>
       ),
     },
@@ -131,9 +142,39 @@ export default function EmployeeList() {
         title="Employees"
         subtitle="Employee master — identity, org placement and salary structure"
         actions={
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate('/employees/new')}>
-            Add Employee
-          </Button>
+          canCreate && (
+            <Stack direction="row" spacing={1.5}>
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => navigate('/employees/bulk-import')}
+              >
+                Bulk Import
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => navigate('/employees/bulk-salary-revision')}
+              >
+                Bulk Salary Revision
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => navigate('/employees/bulk-salary-structure')}
+              >
+                Bulk Salary Structure
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddRoundedIcon />}
+                onClick={() => navigate('/employees/new')}
+                data-testid="employee-create-button"
+              >
+                Add Employee
+              </Button>
+            </Stack>
+          )
         }
       />
       <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap' }}>
@@ -144,6 +185,7 @@ export default function EmployeeList() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: 240 }}
+          slotProps={{ htmlInput: { 'data-testid': 'employee-search-input' } }}
         />
         <TextField
           select
@@ -173,7 +215,43 @@ export default function EmployeeList() {
           <MenuItem value="INACTIVE">Inactive</MenuItem>
         </TextField>
       </Stack>
-      <DataTable rows={filtered} columns={columns} loading={loading} height={600} />
+      <DataTable
+        rows={filtered}
+        columns={columns}
+        loading={loading}
+        height={600}
+        data-testid="employee-table"
+        emptyState={
+          rows.length > 0
+            ? {
+                title: 'No employees found',
+                description: 'There are no employees matching your current search or filters.',
+                action: (
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setSearch('');
+                      setDeptFilter('ALL');
+                      setStatusFilter('ALL');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ),
+              }
+            : {
+                title: 'No employees yet',
+                description: canCreate
+                  ? 'Add your first employee to get started.'
+                  : 'No employees have been added to this company yet.',
+                action: canCreate && (
+                  <Button size="small" variant="contained" onClick={() => navigate('/employees/new')}>
+                    Add Employee
+                  </Button>
+                ),
+              }
+        }
+      />
 
       <ConfirmDialog
         open={!!deactivateTarget}

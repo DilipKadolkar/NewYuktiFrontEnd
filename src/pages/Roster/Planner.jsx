@@ -2,18 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import Alert from '@mui/material/Alert';
 import { useSnackbar } from 'notistack';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import PageHeader from '../../components/PageHeader';
 import DataTable from '../../components/DataTable';
 import EmployeePicker from '../../components/EmployeePicker';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import shiftSchedulesApi from '../../api/shiftSchedules';
 import { useActingAs } from '../../context/ActingAsContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Planner() {
   const { enqueueSnackbar } = useSnackbar();
   const { isSupervisor, actingAs } = useActingAs();
+  const { can } = useAuth();
+  const canManage = can('SHIFT_SCHEDULE_MANAGE');
   const [month, setMonth] = useState(dayjs());
   const [supervisorUserId, setSupervisorUserId] = useState(
     isSupervisor ? actingAs?.userId : null
@@ -21,6 +24,7 @@ export default function Planner() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [overriding, setOverriding] = useState(false);
+  const [overrideConfirmOpen, setOverrideConfirmOpen] = useState(false);
 
   const load = () => {
     if (!month) return;
@@ -73,6 +77,7 @@ export default function Planner() {
         enqueueSnackbar(`Holiday override applied to ${res.updatedDays ?? 0} day(s)`, {
           variant: 'success',
         });
+        setOverrideConfirmOpen(false);
         load();
       })
       .catch(() => {})
@@ -99,24 +104,36 @@ export default function Planner() {
               onChange={setSupervisorUserId}
               filterRole="SUPERVISOR"
             />
-            <Button variant="outlined" onClick={handleHolidayOverride} disabled={overriding}>
-              Apply holiday override
-            </Button>
+            {canManage && (
+              <Button variant="outlined" onClick={() => setOverrideConfirmOpen(true)}>
+                Apply holiday override
+              </Button>
+            )}
           </>
         }
       />
-      {!loading && (!data || rows.length === 0) ? (
-        <Alert severity="info">No roster found for this month/filter yet.</Alert>
-      ) : (
-        <DataTable
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          height={620}
-          pageSize={25}
-          density="compact"
-        />
-      )}
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={620}
+        pageSize={25}
+        density="compact"
+        emptyState={{
+          title: 'No roster for this month',
+          description: 'No shifts have been scheduled for this month or filter yet.',
+        }}
+      />
+
+      <ConfirmDialog
+        open={overrideConfirmOpen}
+        title="Apply holiday override?"
+        description={`Marks every mandatory holiday in ${month.format('MMMM YYYY')} as a week off across the whole roster shown here, replacing any shift already assigned on those dates. This can be re-run safely, but it does overwrite existing assignments on the affected days.`}
+        confirmLabel="Apply override"
+        loading={overriding}
+        onConfirm={handleHolidayOverride}
+        onClose={() => setOverrideConfirmOpen(false)}
+      />
     </>
   );
 }

@@ -8,14 +8,27 @@ import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, initializing } = useAuth();
   const location = useLocation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Identity is no longer seeded synchronously from storage - it is restored
+  // by exchanging the httpOnly refresh cookie on boot. Without this branch a
+  // returning user with a valid session sees the login form flash for the
+  // length of that round trip before being redirected away from it.
+  if (initializing) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (isAuthenticated) {
     return <Navigate to={location.state?.from || '/'} replace />;

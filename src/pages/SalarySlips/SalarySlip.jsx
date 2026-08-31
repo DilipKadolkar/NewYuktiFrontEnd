@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import dayjs from 'dayjs';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -12,8 +12,10 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Alert from '@mui/material/Alert';
+import Skeleton from '@mui/material/Skeleton';
 import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import PageHeader from '../../components/PageHeader';
 import EmployeePicker from '../../components/EmployeePicker';
 import MoneyText from '../../components/MoneyText';
@@ -21,8 +23,9 @@ import salarySlipsApi from '../../api/salarySlips';
 
 export default function SalarySlip({ fixedEmployeeId }) {
   const [employeeId, setEmployeeId] = useState(fixedEmployeeId || null);
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [period, setPeriod] = useState(dayjs());
+  const month = period ? period.month() + 1 : null;
+  const year = period ? period.year() : null;
   const [slip, setSlip] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -55,40 +58,47 @@ export default function SalarySlip({ fixedEmployeeId }) {
             {!fixedEmployeeId && (
               <EmployeePicker label="Employee" value={employeeId} onChange={setEmployeeId} />
             )}
-            <TextField
-              size="small"
+            <DatePicker
               label="Month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value.replace(/[^0-9]/g, ''))}
-              sx={{ width: 90 }}
-            />
-            <TextField
-              size="small"
-              label="Year"
-              value={year}
-              onChange={(e) => setYear(e.target.value.replace(/[^0-9]/g, ''))}
-              sx={{ width: 100 }}
+              views={['year', 'month']}
+              value={period}
+              onChange={setPeriod}
+              slotProps={{ textField: { size: 'small' } }}
             />
             {employeeId && slip && (
               <Button
                 startIcon={<PrintRoundedIcon />}
-                onClick={() => window.open(salarySlipsApi.printUrl(employeeId, month, year), '_blank')}
+                onClick={() =>
+                  window.open(
+                    salarySlipsApi.printUrl(employeeId, month, year),
+                    '_blank',
+                    'noopener,noreferrer'
+                  )
+                }
               >
                 Print
               </Button>
             )}
-            <Button
-              startIcon={<DownloadRoundedIcon />}
-              onClick={() => window.open(salarySlipsApi.exportUrl(month, year), '_blank')}
-            >
-              Export month CSV
-            </Button>
+            {/* Whole-company export - HR/Admin only view, not shown on the
+                employee's own self-service salary-slip screen. */}
+            {!fixedEmployeeId && (
+              <Button
+                startIcon={<DownloadRoundedIcon />}
+                onClick={() =>
+                  window.open(salarySlipsApi.exportUrl(month, year), '_blank', 'noopener,noreferrer')
+                }
+              >
+                Export month CSV
+              </Button>
+            )}
           </>
         }
       />
 
       {!employeeId ? (
         <Alert severity="info">Pick an employee to view their salary slip.</Alert>
+      ) : loading ? (
+        <Skeleton variant="rounded" height={420} sx={{ maxWidth: 720 }} />
       ) : error ? (
         <Alert severity="warning">
           No salary slip for this period — payroll may not have been generated yet.
@@ -183,7 +193,6 @@ export default function SalarySlip({ fixedEmployeeId }) {
           </Card>
         )
       )}
-      {loading && <Typography color="text.secondary">Loading…</Typography>}
     </>
   );
 }

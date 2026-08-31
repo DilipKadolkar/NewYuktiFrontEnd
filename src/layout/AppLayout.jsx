@@ -22,6 +22,7 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import { useAuth } from '../context/AuthContext';
 import navConfig, { platformNavConfig } from './navConfig';
 import { ROLE_COLOR } from '../constants/enums';
+import IdleSessionGuard from '../components/IdleSessionGuard';
 
 const DRAWER_WIDTH = 260;
 
@@ -166,6 +167,7 @@ export default function AppLayout() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <IdleSessionGuard />
       <AppBar
         position="fixed"
         elevation={0}

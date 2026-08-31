@@ -16,6 +16,7 @@ import PageHeader from '../../components/PageHeader';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import salaryRulesApi from '../../api/salaryRules';
 import employeesApi from '../../api/employees';
+import { useAuth } from '../../context/AuthContext';
 
 const NUMBER_FIELDS = [
   { name: 'basicDaPercent', label: 'Basic + DA', suffix: '%' },
@@ -45,7 +46,7 @@ const OTHER_FIELDS = [
   { name: 'overtimeRateMultiplier', label: 'Overtime rate multiplier', suffix: 'x' },
 ];
 
-function NumberSection({ title, fieldsList, values, onChange }) {
+function NumberSection({ title, fieldsList, values, onChange, readOnly }) {
   return (
     <Card sx={{ mb: 2.5 }}>
       <CardHeader title={<Typography variant="subtitle1">{title}</Typography>} />
@@ -58,6 +59,7 @@ function NumberSection({ title, fieldsList, values, onChange }) {
                 size="small"
                 label={f.label}
                 value={values[f.name] ?? ''}
+                disabled={readOnly}
                 onChange={(e) => onChange(f.name, e.target.value.replace(/[^0-9.]/g, ''))}
                 slotProps={{
                   input: { endAdornment: <InputAdornment position="end">{f.suffix}</InputAdornment> },
@@ -73,6 +75,9 @@ function NumberSection({ title, fieldsList, values, onChange }) {
 
 export default function SalaryRule() {
   const { enqueueSnackbar } = useSnackbar();
+  const { can } = useAuth();
+  const canManageRule = can('SALARY_RULE_MANAGE');
+  const canRegenerateStructures = can('EMPLOYEE_UPDATE');
   const [values, setValues] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -167,16 +172,20 @@ export default function SalaryRule() {
         subtitle="The single company-wide salary breakup rule"
         actions={
           <Stack direction="row" spacing={1.5}>
-            <Button
-              color="inherit"
-              startIcon={<RestartAltRoundedIcon />}
-              onClick={() => setRegenerateConfirmOpen(true)}
-            >
-              Regenerate all from rule
-            </Button>
-            <Button variant="contained" onClick={handleSave} disabled={saving}>
-              Save changes
-            </Button>
+            {canRegenerateStructures && (
+              <Button
+                color="inherit"
+                startIcon={<RestartAltRoundedIcon />}
+                onClick={() => setRegenerateConfirmOpen(true)}
+              >
+                Regenerate all from rule
+              </Button>
+            )}
+            {canManageRule && (
+              <Button variant="contained" onClick={handleSave} disabled={saving}>
+                Save changes
+              </Button>
+            )}
           </Stack>
         }
       />
@@ -185,10 +194,34 @@ export default function SalaryRule() {
         percentage here only affects employees you create or update afterward — existing records
         keep what was computed at the time.
       </Alert>
-      <NumberSection title="Salary breakup" fieldsList={NUMBER_FIELDS} values={values} onChange={handleChange} />
-      <NumberSection title="PF, ESIC & MLWF" fieldsList={ESIC_FIELDS} values={values} onChange={handleChange} />
-      <NumberSection title="Professional tax slabs" fieldsList={PT_FIELDS} values={values} onChange={handleChange} />
-      <NumberSection title="Other" fieldsList={OTHER_FIELDS} values={values} onChange={handleChange} />
+      <NumberSection
+        title="Salary breakup"
+        fieldsList={NUMBER_FIELDS}
+        values={values}
+        onChange={handleChange}
+        readOnly={!canManageRule}
+      />
+      <NumberSection
+        title="PF, ESIC & MLWF"
+        fieldsList={ESIC_FIELDS}
+        values={values}
+        onChange={handleChange}
+        readOnly={!canManageRule}
+      />
+      <NumberSection
+        title="Professional tax slabs"
+        fieldsList={PT_FIELDS}
+        values={values}
+        onChange={handleChange}
+        readOnly={!canManageRule}
+      />
+      <NumberSection
+        title="Other"
+        fieldsList={OTHER_FIELDS}
+        values={values}
+        onChange={handleChange}
+        readOnly={!canManageRule}
+      />
 
       <ConfirmDialog
         open={regenerateConfirmOpen}

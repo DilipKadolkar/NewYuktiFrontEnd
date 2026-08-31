@@ -1,0 +1,6 @@
+userId,employeeCode,employeeName,companyId,departmentId,designationId,supervisorUserId,joiningDate,dateOfBirth,status,role,email,phone,grossSalary,pfBasic,medicalAllowance,otherAllowance,overtimeEligible,basicDA,hra,conveyanceAllowance,educationAllowance
+SE10177,SE10177,PANKAJ ANANT GAWADE,1,1,1,,,,PERMANENT,,,,"41,000.00","15,000.00","1,250.00","10,606.00",,"18,215.00","7,286.00","1,822.00","1,822.00"
+SE10255,SE10255,SAVITA SHAILESH GAIKWAD,1,1,1,,,,PERMANENT,,,,"28,000.00","15,000.00",0.00,0.00,,"18,215.00","7,286.00","1,822.00",677.00
+SE10132,SE10132,ATIK AMIN SHAIKH,1,1,1,,,,PERMANENT,,,,"46,000.00","15,000.00","1,250.00","7,950.00",,"23,000.00","9,200.00","2,300.00","2,300.00"
+SE10036,SE10036,SANDIP KALLAPA PATIL,1,1,1,,,,PERMANENT,,,,"167,000.00","15,000.00","1,250.00","32,150.00",,"83,500.00","33,400.00","8,350.00","8,350.00"
+SE10066,SE10066,ARVIND SHIVAJI RATHOD,1,1,1,,,,PERMANENT,,,,"57,000.00","15,000.00","1,250.00","10,150.00",,"28,500.00","11,400.00","2,850.00","2,850.00"

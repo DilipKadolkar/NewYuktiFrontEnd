@@ -90,7 +90,20 @@ export default function ReportPage({ title, subtitle, filterType = 'none', fetch
   return (
     <>
       <PageHeader title={title} subtitle={subtitle} actions={filters} />
-      <DataTable rows={rows} columns={columns} loading={loading} getRowId={getRowId} height={600} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        getRowId={getRowId}
+        height={600}
+        emptyState={{
+          title: 'No data for this report',
+          description:
+            filterType === 'none'
+              ? 'There is nothing to show yet.'
+              : 'Try a different month, year or filter.',
+        }}
+      />
     </>
   );
 }

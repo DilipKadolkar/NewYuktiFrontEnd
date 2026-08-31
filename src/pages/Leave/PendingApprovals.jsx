@@ -19,6 +19,7 @@ import StatusChip from '../../components/StatusChip';
 import leavesApi from '../../api/leaves';
 import { LEAVE_STATUS_COLOR, labelize } from '../../constants/enums';
 import { useActingAs } from '../../context/ActingAsContext';
+import { useAuth } from '../../context/AuthContext';
 
 function DecisionDialog({ open, action, target, onClose, onDone }) {
   const { enqueueSnackbar } = useSnackbar();
@@ -84,7 +85,10 @@ function DecisionDialog({ open, action, target, onClose, onDone }) {
 }
 
 export default function PendingApprovals() {
-  const { actingAs, isSupervisorOrAbove, isHrOrAdmin } = useActingAs();
+  const { actingAs } = useActingAs();
+  const { can } = useAuth();
+  const canEndorse = can('LEAVE_SUPERVISOR_APPROVE');
+  const canApprove = can('LEAVE_APPROVE');
   const [supervisorQueue, setSupervisorQueue] = useState([]);
   const [hrQueue, setHrQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,13 +98,9 @@ export default function PendingApprovals() {
     if (!actingAs) return;
     setLoading(true);
     const calls = [];
+    calls.push(canEndorse ? leavesApi.pendingFor(actingAs.userId).catch(() => []) : Promise.resolve([]));
     calls.push(
-      isSupervisorOrAbove
-        ? leavesApi.pendingFor(actingAs.userId).catch(() => [])
-        : Promise.resolve([])
-    );
-    calls.push(
-      isHrOrAdmin ? leavesApi.byStatus('SUPERVISOR_APPROVED').catch(() => []) : Promise.resolve([])
+      canApprove ? leavesApi.byStatus('SUPERVISOR_APPROVED').catch(() => []) : Promise.resolve([])
     );
     Promise.all(calls)
       .then(([sup, hr]) => {
@@ -179,7 +179,7 @@ export default function PendingApprovals() {
     },
   ];
 
-  if (!isSupervisorOrAbove && !isHrOrAdmin) {
+  if (!canEndorse && !canApprove) {
     return <Alert severity="info">Only supervisors, HR and admins have an approval queue.</Alert>;
   }
 
@@ -187,21 +187,33 @@ export default function PendingApprovals() {
     <>
       <PageHeader title="Pending Approvals" subtitle="Leave requests waiting on your decision" />
 
-      {isSupervisorOrAbove && (
+      {canEndorse && (
         <Box sx={{ mb: 4 }}>
           <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
             Awaiting your endorsement (as supervisor)
           </Typography>
-          <DataTable rows={supervisorQueue} columns={supervisorColumns} loading={loading} height={340} />
+          <DataTable
+            rows={supervisorQueue}
+            columns={supervisorColumns}
+            loading={loading}
+            height={340}
+            emptyState={{ title: 'Nothing waiting on you', description: 'No leave requests need your endorsement right now.' }}
+          />
         </Box>
       )}
 
-      {isHrOrAdmin && (
+      {canApprove && (
         <Box>
           <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
             Awaiting final HR/Admin approval
           </Typography>
-          <DataTable rows={hrQueue} columns={hrColumns} loading={loading} height={340} />
+          <DataTable
+            rows={hrQueue}
+            columns={hrColumns}
+            loading={loading}
+            height={340}
+            emptyState={{ title: 'Nothing waiting on you', description: 'No leave requests need final approval right now.' }}
+          />
         </Box>
       )}
 

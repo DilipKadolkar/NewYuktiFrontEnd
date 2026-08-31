@@ -84,7 +84,16 @@ export default function List() {
           </Grid>
         }
       />
-      <DataTable rows={rows} columns={columns} loading={loading} height={600} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={600}
+        emptyState={{
+          title: 'No payroll for this period',
+          description: 'No payroll has been generated for this month and year yet.',
+        }}
+      />
     </>
   );
 }

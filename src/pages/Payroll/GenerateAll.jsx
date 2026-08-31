@@ -51,7 +51,14 @@ export default function GenerateAll() {
       .generateAll(Number(month), Number(year), actingAs?.userId)
       .then((res) => {
         setResults(res);
-        enqueueSnackbar(`Generated payroll for ${res.length} employee(s)`, { variant: 'success' });
+        if (res.failureCount > 0) {
+          enqueueSnackbar(
+            `Generated payroll for ${res.successCount} employee(s), ${res.failureCount} failed — see below`,
+            { variant: res.successCount > 0 ? 'warning' : 'error' }
+          );
+        } else {
+          enqueueSnackbar(`Generated payroll for ${res.successCount} employee(s)`, { variant: 'success' });
+        }
       })
       .catch(() => {})
       .finally(() => setSaving(false));
@@ -95,13 +102,27 @@ export default function GenerateAll() {
 
       {results && (
         <>
-          {results.length === 0 && (
+          {results.successCount === 0 && results.failureCount === 0 && (
             <Alert severity="info" sx={{ mb: 2 }}>
-              Nothing generated — everyone for this period may already have payroll, or no one has
-              generated attendance yet.
+              Nothing generated — everyone for this period may already have payroll.
             </Alert>
           )}
-          <DataTable rows={results} columns={columns} getRowId={(r) => r.id} height={480} />
+          {results.failureCount > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {results.failureCount} employee(s) could not be generated — the rest were generated
+              normally.
+              <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+                {results.errors.map((e) => (
+                  <li key={`${e.rowNumber}-${e.identifier}`}>
+                    {e.identifier || `row ${e.rowNumber}`}: {e.message}
+                  </li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+          {results.successCount > 0 && (
+            <DataTable rows={results.succeeded} columns={columns} getRowId={(r) => r.id} height={480} />
+          )}
         </>
       )}
     </>

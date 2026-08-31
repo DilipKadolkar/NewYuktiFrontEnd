@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import Grid from '@mui/material/Grid';
 import Card from '@mui/material/Card';
@@ -12,6 +12,9 @@ import ListItem from '@mui/material/ListItem';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Skeleton from '@mui/material/Skeleton';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import EventBusyRoundedIcon from '@mui/icons-material/EventBusyRounded';
@@ -40,25 +43,61 @@ import PageHeader from '../../components/PageHeader';
 import StatCard from '../../components/StatCard';
 import dashboardApi from '../../api/dashboard';
 import { formatMoney } from '../../components/MoneyText';
+import { tokens } from '../../theme/theme';
 
-const PIE_COLORS = ['#0F9D8B', '#2F6FED', '#E2A400', '#E0483F', '#8A6FED', '#3FBCAC'];
+const PIE_COLORS = [
+  tokens.color.accent.main,
+  tokens.color.secondary.main,
+  tokens.color.warning.main,
+  tokens.color.error.main,
+  '#8A6FED',
+  tokens.color.accent.light,
+];
 
-function ChartCard({ title, height = 300, children }) {
+function SectionLabel({ children }) {
+  return (
+    <Typography
+      variant="overline"
+      color="text.secondary"
+      sx={{ display: 'block', mb: 1.25, mt: 0.5 }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+function ChartCard({ title, height = 300, loading, children }) {
   return (
     <Card sx={{ height: '100%' }}>
       <CardHeader title={<Typography variant="subtitle1">{title}</Typography>} />
       <CardContent sx={{ pt: 0 }}>
         <Box sx={{ height }}>
-          <ResponsiveContainer width="100%" height="100%">
-            {children}
-          </ResponsiveContainer>
+          {loading ? (
+            <Skeleton variant="rounded" width="100%" height="100%" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              {children}
+            </ResponsiveContainer>
+          )}
         </Box>
       </CardContent>
     </Card>
   );
 }
 
-function PersonList({ items, emptyText, dateSuffix }) {
+function PersonList({ items, emptyText, dateSuffix, loading }) {
+  if (loading) {
+    return (
+      <Stack spacing={1.5} sx={{ py: 0.5 }}>
+        {[0, 1, 2].map((i) => (
+          <Stack key={i} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <Skeleton variant="circular" width={32} height={32} />
+            <Skeleton variant="text" width="70%" />
+          </Stack>
+        ))}
+      </Stack>
+    );
+  }
   if (!items || items.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
@@ -91,15 +130,24 @@ export default function Dashboard() {
   const [asOf, setAsOf] = useState(dayjs());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
+    setLoadFailed(false);
     dashboardApi
       .get(asOf ? asOf.format('YYYY-MM-DD') : undefined)
-      .then(setData)
-      .catch(() => setData(null))
+      .then((res) => setData(res))
+      .catch(() => {
+        setData(null);
+        setLoadFailed(true);
+      })
       .finally(() => setLoading(false));
   }, [asOf]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const cards = data?.cards;
   const charts = data?.charts;
@@ -112,6 +160,30 @@ export default function Dashboard() {
     () => (charts?.leaveUsage || []).map((p) => ({ name: p.label, value: Number(p.value) })),
     [charts]
   );
+
+  if (loadFailed) {
+    return (
+      <Box>
+        <PageHeader title="Dashboard" subtitle="Company-wide snapshot of attendance, leave and payroll" />
+        <Card sx={{ p: 5, textAlign: 'center' }}>
+          <Typography variant="subtitle1" sx={{ mb: 0.5 }}>
+            Couldn&apos;t load the dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+            Check your connection and try again.
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshRoundedIcon />}
+            onClick={load}
+            data-testid="dashboard-retry-button"
+          >
+            Try again
+          </Button>
+        </Card>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -128,47 +200,63 @@ export default function Dashboard() {
         }
       />
 
+      <SectionLabel>Workforce &amp; attendance</SectionLabel>
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Total employees" value={cards?.totalEmployees ?? '-'} icon={<PeopleAltRoundedIcon />} accent="primary.main" />
+          <StatCard loading={loading} label="Total employees" value={cards?.totalEmployees} icon={<PeopleAltRoundedIcon fontSize="small" />} accent="primary.main" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Present today" value={cards?.presentToday ?? '-'} icon={<EventAvailableRoundedIcon />} accent="success.main" />
+          <StatCard loading={loading} label="Present today" value={cards?.presentToday} icon={<EventAvailableRoundedIcon fontSize="small" />} accent="success.main" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Absent today" value={cards?.absentToday ?? '-'} icon={<EventBusyRoundedIcon />} accent="error.main" />
+          <StatCard loading={loading} label="Absent today" value={cards?.absentToday} icon={<EventBusyRoundedIcon fontSize="small" />} accent="error.main" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="On leave" value={cards?.employeesOnLeave ?? '-'} icon={<BeachAccessRoundedIcon />} accent="info.main" />
+          <StatCard loading={loading} label="Unscheduled tomorrow" value={cards?.unscheduledTomorrow} icon={<EventRepeatRoundedIcon fontSize="small" />} accent="secondary.main" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Pending leave requests" value={cards?.pendingLeaveRequests ?? '-'} icon={<HourglassTopRoundedIcon />} accent="warning.main" />
+      </Grid>
+
+      <SectionLabel>Leave</SectionLabel>
+      <Grid container spacing={2.5} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <StatCard loading={loading} label="On leave today" value={cards?.employeesOnLeave} icon={<BeachAccessRoundedIcon fontSize="small" />} accent="info.main" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Unscheduled tomorrow" value={cards?.unscheduledTomorrow ?? '-'} icon={<EventRepeatRoundedIcon />} accent="secondary.main" />
+        <Grid size={{ xs: 12, md: 6 }}>
+          <StatCard loading={loading} label="Pending leave requests" value={cards?.pendingLeaveRequests} icon={<HourglassTopRoundedIcon fontSize="small" />} accent="warning.main" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Payroll generated this month" value={cards?.payrollGeneratedThisMonth ?? '-'} icon={<PaymentsRoundedIcon />} accent="primary.dark" />
+      </Grid>
+
+      <SectionLabel>Payroll &amp; people</SectionLabel>
+      <Grid container spacing={2.5} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <StatCard loading={loading} label="Payroll generated this month" value={cards?.payrollGeneratedThisMonth} icon={<PaymentsRoundedIcon fontSize="small" />} accent="primary.dark" />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard label="Upcoming birthdays" value={cards?.upcomingBirthdays?.length ?? 0} icon={<CakeRoundedIcon />} accent="#8A6FED" />
+        <Grid size={{ xs: 12, md: 6 }}>
+          <StatCard loading={loading} label="Upcoming birthdays" value={cards?.upcomingBirthdays?.length ?? (loading ? undefined : 0)} icon={<CakeRoundedIcon fontSize="small" />} accent="#8A6FED" />
         </Grid>
       </Grid>
 
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, md: 7 }}>
-          <ChartCard title="14-day attendance trend">
+          <ChartCard title="14-day attendance trend" loading={loading}>
             <LineChart data={charts?.attendanceTrend || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E4E9EE" />
+              <CartesianGrid strokeDasharray="3 3" stroke={tokens.color.neutral.border} />
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
               <Tooltip />
-              <Line type="monotone" dataKey="value" name="Present" stroke="#0F9D8B" strokeWidth={2} dot={false} />
+              <Line
+                type="monotone"
+                dataKey="value"
+                name="Present"
+                stroke={tokens.color.accent.main}
+                strokeWidth={2}
+                dot={false}
+              />
             </LineChart>
           </ChartCard>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
-          <ChartCard title="Department strength">
+          <ChartCard title="Department strength" loading={loading}>
             <PieChart>
               <Pie data={departmentPie} dataKey="value" nameKey="name" outerRadius={90} label>
                 {departmentPie.map((entry, idx) => (
@@ -181,18 +269,18 @@ export default function Dashboard() {
           </ChartCard>
         </Grid>
         <Grid size={{ xs: 12, md: 7 }}>
-          <ChartCard title="Payroll cost (last 6 months)">
+          <ChartCard title="Payroll cost (last 6 months)" loading={loading}>
             <BarChart data={charts?.payrollCost || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E4E9EE" />
+              <CartesianGrid strokeDasharray="3 3" stroke={tokens.color.neutral.border} />
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(v) => formatMoney(v)} />
-              <Bar dataKey="value" name="Net payroll" fill="#2F6FED" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="value" name="Net payroll" fill={tokens.color.secondary.main} radius={[6, 6, 0, 0]} />
             </BarChart>
           </ChartCard>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
-          <ChartCard title="Leave usage by type">
+          <ChartCard title="Leave usage by type" loading={loading}>
             <PieChart>
               <Pie data={leaveUsagePie} dataKey="value" nameKey="name" outerRadius={90} label>
                 {leaveUsagePie.map((entry, idx) => (
@@ -211,7 +299,12 @@ export default function Dashboard() {
           <Card>
             <CardHeader title={<Typography variant="subtitle1">Upcoming birthdays</Typography>} />
             <CardContent sx={{ pt: 0 }}>
-              <PersonList items={cards?.upcomingBirthdays} emptyText="No birthdays in the coming days." dateSuffix="s old" />
+              <PersonList
+                loading={loading}
+                items={cards?.upcomingBirthdays}
+                emptyText="No birthdays in the coming days."
+                dateSuffix="s old"
+              />
             </CardContent>
           </Card>
         </Grid>
@@ -219,17 +312,16 @@ export default function Dashboard() {
           <Card>
             <CardHeader title={<Typography variant="subtitle1">Upcoming work anniversaries</Typography>} />
             <CardContent sx={{ pt: 0 }}>
-              <PersonList items={cards?.upcomingWorkAnniversaries} emptyText="No anniversaries in the coming days." dateSuffix=" with us" />
+              <PersonList
+                loading={loading}
+                items={cards?.upcomingWorkAnniversaries}
+                emptyText="No anniversaries in the coming days."
+                dateSuffix=" with us"
+              />
             </CardContent>
           </Card>
         </Grid>
       </Grid>
-
-      {!loading && !data && (
-        <Stack sx={{ mt: 4, alignItems: 'center' }}>
-          <Typography color="text.secondary">Could not load dashboard data.</Typography>
-        </Stack>
-      )}
     </Box>
   );
 }

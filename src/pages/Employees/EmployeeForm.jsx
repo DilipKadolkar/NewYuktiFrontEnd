@@ -13,16 +13,21 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Alert from '@mui/material/Alert';
 import Skeleton from '@mui/material/Skeleton';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useSnackbar } from 'notistack';
 import PageHeader from '../../components/PageHeader';
 import EmployeePicker from '../../components/EmployeePicker';
 import TempPasswordDialog from '../../components/TempPasswordDialog';
-import { EMPLOYEE_STATUS, ROLE, RECORD_STATUS, labelize } from '../../constants/enums';
+import { EMPLOYEE_STATUS, ROLE, RECORD_STATUS, GENDER, labelize } from '../../constants/enums';
 import employeesApi from '../../api/employees';
 import companiesApi from '../../api/companies';
 import departmentsApi from '../../api/departments';
 import designationsApi from '../../api/designations';
+import categoriesApi from '../../api/categories';
 import { useActingAs } from '../../context/ActingAsContext';
 
 const emptyForm = {
@@ -32,19 +37,32 @@ const emptyForm = {
   companyId: '',
   departmentId: '',
   designationId: '',
+  categoryId: '',
   supervisorUserId: null,
   joiningDate: null,
   dateOfBirth: null,
+  gender: '',
   status: 'PERMANENT',
   recordStatus: 'ACTIVE',
   role: 'EMPLOYEE',
   email: '',
   phone: '',
+  uanNo: '',
+  esicIpNo: '',
+  bankAccountNo: '',
+  bankIfscNo: '',
   grossSalary: '',
   pfBasic: '',
   medicalAllowance: '',
   otherAllowance: '',
   overtimeEligible: false,
+  // Create-time-only escape hatch: skip rule-derivation and pin these four directly
+  // (e.g. migrating from an existing payroll system that already has exact figures).
+  structureOverride: false,
+  basicDA: '',
+  hra: '',
+  conveyanceAllowance: '',
+  educationAllowance: '',
 };
 
 export default function EmployeeForm() {
@@ -58,27 +76,44 @@ export default function EmployeeForm() {
   const [companies, setCompanies] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(isEdit);
+  const [mastersLoaded, setMastersLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tempPassword, setTempPassword] = useState(null);
+  // Bank/statutory fields are masked (type="password") until individually revealed -
+  // they're editable, so unlike the read-only detail page a plain mask isn't enough.
+  const [revealed, setRevealed] = useState({});
+  const toggleRevealed = (name) => setRevealed((prev) => ({ ...prev, [name]: !prev[name] }));
 
   useEffect(() => {
-    Promise.all([companiesApi.list(), departmentsApi.list(), designationsApi.list()]).then(
-      ([c, d, des]) => {
-        setCompanies(c);
-        setDepartments(d);
-        setDesignations(des);
-      }
-    );
+    Promise.all([
+      companiesApi.list(),
+      departmentsApi.list(),
+      designationsApi.list(),
+      categoriesApi.list(),
+    ]).then(([c, d, des, cat]) => {
+      setCompanies(c);
+      setDepartments(d);
+      setDesignations(des);
+      setCategories(cat);
+      setMastersLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
-    if (!isEdit || companies.length === 0 || departments.length === 0 || designations.length === 0)
-      return;
+    // Was gated on companies/departments/designations.length > 0, which is
+    // indistinguishable from "still loading" when a company genuinely has
+    // zero departments or designations configured yet - the edit form got
+    // stuck on its loading skeleton forever for a freshly onboarded company.
+    // department/designation are optional on an employee (see `?? ''` below),
+    // so an empty list is a valid loaded state, not a not-yet-loaded one.
+    if (!isEdit || !mastersLoaded) return;
     employeesApi.get(id).then((emp) => {
       const company = companies.find((c) => c.companyName === emp.companyName);
       const department = departments.find((d) => d.departmentName === emp.departmentName);
       const designation = designations.find((d) => d.designationName === emp.designationName);
+      const category = categories.find((c) => c.categoryName === emp.categoryName);
       setForm({
         userId: emp.userId,
         employeeCode: emp.employeeCode,
@@ -86,14 +121,20 @@ export default function EmployeeForm() {
         companyId: company?.id ?? '',
         departmentId: department?.id ?? '',
         designationId: designation?.id ?? '',
+        categoryId: category?.id ?? '',
         supervisorUserId: emp.supervisorUserId,
         joiningDate: emp.joiningDate ? dayjs(emp.joiningDate) : null,
         dateOfBirth: emp.dateOfBirth ? dayjs(emp.dateOfBirth) : null,
+        gender: emp.gender || '',
         status: emp.status,
         recordStatus: emp.recordStatus,
         role: emp.role,
         email: emp.email || '',
         phone: emp.phone || '',
+        uanNo: emp.uanNo || '',
+        esicIpNo: emp.esicIpNo || '',
+        bankAccountNo: emp.bankAccountNo || '',
+        bankIfscNo: emp.bankIfscNo || '',
         grossSalary: emp.grossSalary ?? '',
         pfBasic: emp.pfBasic ?? '',
         medicalAllowance: emp.medicalAllowance ?? '',
@@ -103,7 +144,7 @@ export default function EmployeeForm() {
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, id, companies, departments, designations]);
+  }, [isEdit, id, companies, departments, designations, categories]);
 
   const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
@@ -120,7 +161,9 @@ export default function EmployeeForm() {
       form.grossSalary !== '' &&
       form.pfBasic !== '' &&
       form.medicalAllowance !== '' &&
-      form.otherAllowance !== '',
+      form.otherAllowance !== '' &&
+      (!form.structureOverride ||
+        (form.basicDA !== '' && form.hra !== '' && form.conveyanceAllowance !== '' && form.educationAllowance !== '')),
     [form]
   );
 
@@ -133,19 +176,35 @@ export default function EmployeeForm() {
       companyId: Number(form.companyId),
       departmentId: Number(form.departmentId),
       designationId: Number(form.designationId),
+      categoryId: form.categoryId ? Number(form.categoryId) : null,
       supervisorUserId: form.supervisorUserId || null,
       joiningDate: form.joiningDate ? form.joiningDate.format('YYYY-MM-DD') : null,
       dateOfBirth: form.dateOfBirth ? form.dateOfBirth.format('YYYY-MM-DD') : null,
+      gender: form.gender || null,
       status: form.status,
       recordStatus: form.recordStatus,
       role: form.role,
       email: form.email || null,
       phone: form.phone || null,
+      uanNo: form.uanNo || null,
+      esicIpNo: form.esicIpNo || null,
+      bankAccountNo: form.bankAccountNo || null,
+      bankIfscNo: form.bankIfscNo || null,
       grossSalary: form.grossSalary,
       pfBasic: form.pfBasic,
       medicalAllowance: form.medicalAllowance,
       otherAllowance: form.otherAllowance,
       overtimeEligible: form.overtimeEligible,
+      // Omitted entirely (not sent as null/empty) when the toggle is off, so the server
+      // still derives the structure from the salary rule exactly as before this existed.
+      ...(!isEdit && form.structureOverride
+        ? {
+            basicDA: form.basicDA,
+            hra: form.hra,
+            conveyanceAllowance: form.conveyanceAllowance,
+            educationAllowance: form.educationAllowance,
+          }
+        : {}),
     };
     if (isEdit) {
       employeesApi
@@ -246,7 +305,25 @@ export default function EmployeeForm() {
                 slotProps={{ textField: { size: 'small', fullWidth: true } }}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 4 }} />
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Gender"
+                value={form.gender}
+                onChange={(e) => set('gender', e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Not specified</em>
+                </MenuItem>
+                {GENDER.map((g) => (
+                  <MenuItem key={g} value={g}>
+                    {labelize(g)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 fullWidth
@@ -326,6 +403,25 @@ export default function EmployeeForm() {
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Category"
+                value={form.categoryId}
+                onChange={(e) => set('categoryId', e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {categories.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.categoryName}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <EmployeePicker
                 label="Supervisor"
                 value={form.supervisorUserId}
@@ -389,11 +485,70 @@ export default function EmployeeForm() {
       </Card>
 
       <Card sx={{ mb: 2.5 }}>
+        <CardHeader title={<Typography variant="subtitle1">Statutory & bank details</Typography>} />
+        <CardContent sx={{ pt: 0 }}>
+          <Grid container spacing={2}>
+            {[
+              { name: 'uanNo', label: 'UAN No' },
+              { name: 'esicIpNo', label: 'ESIC IP No' },
+              { name: 'bankAccountNo', label: 'Bank Account No' },
+              { name: 'bankIfscNo', label: 'Bank IFSC No', upper: true },
+            ].map((f) => (
+              <Grid key={f.name} size={{ xs: 12, sm: 3 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label={f.label}
+                  type={revealed[f.name] ? 'text' : 'password'}
+                  value={form[f.name]}
+                  onChange={(e) => set(f.name, f.upper ? e.target.value.toUpperCase() : e.target.value)}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            edge="end"
+                            aria-label={revealed[f.name] ? `Hide ${f.label}` : `Show ${f.label}`}
+                            onClick={() => toggleRevealed(f.name)}
+                          >
+                            {revealed[f.name] ? (
+                              <VisibilityOffRoundedIcon fontSize="small" />
+                            ) : (
+                              <VisibilityRoundedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 2.5 }}>
         <CardHeader title={<Typography variant="subtitle1">Salary inputs</Typography>} />
         <CardContent sx={{ pt: 0 }}>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Basic+DA, HRA, Conveyance, Education and Gross Wage are derived by the server from the
-            current salary rule — they cannot be entered directly.
+            {isEdit ? (
+              <>
+                Basic+DA, HRA, Conveyance, Education and Gross Wage are derived by the server from
+                the current salary rule — they cannot be entered directly here. Use the salary
+                structure &quot;Override&quot; action on the employee&apos;s detail page to pin them
+                by hand, or &quot;Revise salary&quot; to change gross salary with a recorded reason.
+              </>
+            ) : (
+              <>
+                Basic+DA, HRA, Conveyance, Education and Gross Wage are normally derived by the
+                server from the current salary rule. If this employee&apos;s exact breakup is
+                already known — migrating from an existing payroll system, say — turn on
+                &quot;I already know the exact structure&quot; below to enter all four directly
+                instead of having them recalculated.
+              </>
+            )}
           </Alert>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 3 }}>
@@ -447,6 +602,64 @@ export default function EmployeeForm() {
                 label="Overtime eligible"
               />
             </Grid>
+
+            {!isEdit && (
+              <Grid size={{ xs: 12 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.structureOverride}
+                      onChange={(e) => set('structureOverride', e.target.checked)}
+                    />
+                  }
+                  label="I already know the exact salary structure"
+                />
+              </Grid>
+            )}
+            {!isEdit && form.structureOverride && (
+              <>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Basic + DA"
+                    required
+                    value={form.basicDA}
+                    onChange={(e) => set('basicDA', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="HRA"
+                    required
+                    value={form.hra}
+                    onChange={(e) => set('hra', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Conveyance"
+                    required
+                    value={form.conveyanceAllowance}
+                    onChange={(e) => set('conveyanceAllowance', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Education"
+                    required
+                    value={form.educationAllowance}
+                    onChange={(e) => set('educationAllowance', e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
+                </Grid>
+              </>
+            )}
           </Grid>
         </CardContent>
       </Card>

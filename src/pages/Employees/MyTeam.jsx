@@ -15,6 +15,7 @@ const columns = (navigate) => [
   { field: 'userId', headerName: 'User ID', width: 110 },
   { field: 'departmentName', headerName: 'Department', width: 160 },
   { field: 'designationName', headerName: 'Designation', width: 170 },
+  { field: 'categoryName', headerName: 'Category', width: 130 },
   { field: 'status', headerName: 'Employment', width: 130, valueFormatter: (v) => labelize(v) },
   {
     field: 'recordStatus',

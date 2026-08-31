@@ -24,6 +24,7 @@ import DataTable from '../../components/DataTable';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import holidaysApi from '../../api/holidays';
 import companiesApi from '../../api/companies';
+import { useAuth } from '../../context/AuthContext';
 
 const emptyForm = {
   companyId: '',
@@ -35,6 +36,8 @@ const emptyForm = {
 
 export default function Holidays() {
   const { enqueueSnackbar } = useSnackbar();
+  const { can } = useAuth();
+  const canManage = can('HOLIDAY_MANAGE');
   const [rows, setRows] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,20 +153,21 @@ export default function Holidays() {
       sortable: false,
       filterable: false,
       width: 100,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Edit">
-            <IconButton size="small" onClick={() => openEdit(params.row)}>
-              <EditRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete">
-            <IconButton size="small" onClick={() => setDeleteTarget(params.row)}>
-              <DeleteRoundedIcon fontSize="small" color="error" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
+      renderCell: (params) =>
+        canManage && (
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="Edit">
+              <IconButton size="small" onClick={() => openEdit(params.row)}>
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" onClick={() => setDeleteTarget(params.row)}>
+                <DeleteRoundedIcon fontSize="small" color="error" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        ),
     },
   ];
 
@@ -173,16 +177,34 @@ export default function Holidays() {
         title="Holidays"
         subtitle="A mandatory holiday is removed from working days; optional holidays stay working days unless taken as leave"
         actions={
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate}>
-            Add Holiday
-          </Button>
+          canManage && (
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate}>
+              Add Holiday
+            </Button>
+          )
         }
       />
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <DatePicker label="From" value={fromDate} onChange={setFromDate} slotProps={{ textField: { size: 'small' } }} />
         <DatePicker label="To" value={toDate} onChange={setToDate} slotProps={{ textField: { size: 'small' } }} />
       </Stack>
-      <DataTable rows={rows} columns={columns} loading={loading} height={520} />
+      <DataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        height={520}
+        emptyState={{
+          title: 'No holidays configured',
+          description: canManage
+            ? 'Add holidays so attendance and leave calculations account for them.'
+            : 'No holidays have been configured for this period yet.',
+          action: canManage && (
+            <Button size="small" variant="contained" onClick={openCreate}>
+              Add Holiday
+            </Button>
+          ),
+        }}
+      />
 
       <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editing ? 'Edit Holiday' : 'Add Holiday'}</DialogTitle>

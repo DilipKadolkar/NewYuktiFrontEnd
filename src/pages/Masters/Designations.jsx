@@ -1,5 +1,6 @@
 import MasterCrudPage from '../../components/MasterCrudPage';
 import designationsApi from '../../api/designations';
+import { useAuth } from '../../context/AuthContext';
 
 const columns = [
   { field: 'designationCode', headerName: 'Code', width: 130 },
@@ -14,6 +15,7 @@ const fields = [
 ];
 
 export default function Designations() {
+  const { can } = useAuth();
   return (
     <MasterCrudPage
       title="Designations"
@@ -22,6 +24,7 @@ export default function Designations() {
       columns={columns}
       fields={fields}
       entityLabel="Designation"
+      readOnly={!can('DESIGNATION_MANAGE')}
     />
   );
 }

@@ -1,5 +1,6 @@
 import ReportPage from './ReportPage';
 import reportsApi from '../../api/reports';
+import { formatHours } from '../../utils/hours';
 
 const columns = [
   { field: 'userId', headerName: 'User ID', width: 100 },
@@ -13,8 +14,8 @@ const columns = [
   { field: 'lateCount', headerName: 'Late', width: 80 },
   { field: 'earlyExitCount', headerName: 'Early exits', width: 100 },
   { field: 'invalidPunches', headerName: 'Invalid punches', width: 130 },
-  { field: 'totalHours', headerName: 'Total hrs', width: 100 },
-  { field: 'overtimeHours', headerName: 'OT hrs', width: 90 },
+  { field: 'totalHours', headerName: 'Total hrs', width: 100, valueFormatter: formatHours },
+  { field: 'overtimeHours', headerName: 'OT hrs', width: 90, valueFormatter: formatHours },
 ];
 
 export default function AttendanceMonthlyReport() {

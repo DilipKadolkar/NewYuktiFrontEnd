@@ -9,9 +9,24 @@ import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import BeachAccessRoundedIcon from '@mui/icons-material/BeachAccessRounded';
 import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
+import AccountBalanceRoundedIcon from '@mui/icons-material/AccountBalanceRounded';
+import GavelRoundedIcon from '@mui/icons-material/GavelRounded';
 import PageHeader from '../../components/PageHeader';
 
 const GROUPS = [
+  {
+    label: 'Payroll Audit',
+    items: [
+      {
+        label: 'Monthly Payroll Audit',
+        path: '/reports/payroll/audit',
+        icon: FactCheckRoundedIcon,
+        description: 'Fixed vs earned wages, per-day rate, OT, hours and deductions — with a day-wise drill-down',
+      },
+    ],
+  },
   {
     label: 'People',
     items: [{ label: 'Employee Master', path: '/reports/employees', icon: PeopleAltRoundedIcon }],
@@ -24,21 +39,106 @@ const GROUPS = [
       { label: 'Absent', path: '/reports/attendance/absent', icon: EventAvailableRoundedIcon },
       { label: 'Overtime', path: '/reports/attendance/overtime', icon: EventAvailableRoundedIcon },
       { label: 'Loss of Pay', path: '/reports/attendance/lop', icon: EventAvailableRoundedIcon },
+      {
+        label: 'Attendance Exceptions',
+        path: '/reports/attendance/exceptions',
+        icon: EventAvailableRoundedIcon,
+        description: 'Late-ins, early-outs, missed punches and unexplained absences, day by day',
+      },
+      {
+        label: 'Overtime Register',
+        path: '/reports/attendance/overtime-register',
+        icon: EventAvailableRoundedIcon,
+        description: 'Day-level overtime priced at the rate payroll used',
+      },
     ],
   },
   {
     label: 'Leave',
-    items: [{ label: 'Leave Balances', path: '/reports/leave-balances', icon: BeachAccessRoundedIcon }],
+    items: [
+      { label: 'Leave Balances', path: '/reports/leave-balances', icon: BeachAccessRoundedIcon },
+      {
+        label: 'Leave Transactions',
+        path: '/reports/leave/transactions',
+        icon: BeachAccessRoundedIcon,
+        description: 'Every request and what became of it — approvals, rejections, cancellations',
+      },
+    ],
   },
   {
-    label: 'Payroll & Statutory',
+    label: 'Payroll',
     items: [
       { label: 'Payroll', path: '/reports/payroll', icon: PaymentsRoundedIcon },
       { label: 'Payroll by Department', path: '/reports/payroll/by-department', icon: PaymentsRoundedIcon },
       { label: 'Payroll by Company', path: '/reports/payroll/by-company', icon: PaymentsRoundedIcon },
+      {
+        label: 'Payroll Register',
+        path: '/reports/payroll/register',
+        icon: ReceiptLongRoundedIcon,
+        description: 'Full CTC breakup and every earning and deduction head, per employee per run',
+      },
+      {
+        label: 'Payslip Register',
+        path: '/reports/payroll/payslip-register',
+        icon: ReceiptLongRoundedIcon,
+        description: 'Every employee\u2019s payslip totals for the period, in bulk',
+      },
+      {
+        label: 'Salary Revisions & Arrears',
+        path: '/reports/payroll/salary-revisions',
+        icon: PaymentsRoundedIcon,
+        description: 'Revisions in the window and the periods a retrospective one left underpaid',
+      },
+      {
+        label: 'Bank Transfer Advice',
+        path: '/reports/payroll/bank-transfer',
+        icon: AccountBalanceRoundedIcon,
+        description: 'The disbursement instruction, with bank-file control totals',
+      },
+      {
+        label: 'Full & Final Settlement',
+        path: '/reports/payroll/full-and-final',
+        icon: PaymentsRoundedIcon,
+        description: 'The exit worksheet for everyone relieved in the window',
+      },
+    ],
+  },
+  {
+    label: 'Statutory & Compliance',
+    items: [
       { label: 'Provident Fund', path: '/reports/statutory/pf', icon: PaymentsRoundedIcon },
       { label: 'Professional Tax', path: '/reports/statutory/professional-tax', icon: PaymentsRoundedIcon },
       { label: 'ESIC', path: '/reports/statutory/esic', icon: PaymentsRoundedIcon },
+      {
+        label: 'PF ECR',
+        path: '/reports/statutory/pf-ecr',
+        icon: GavelRoundedIcon,
+        description: 'Member-wise contribution lines in the EPFO ECR column order',
+      },
+      {
+        label: 'ESI Return',
+        path: '/reports/statutory/esi-return',
+        icon: GavelRoundedIcon,
+        description: 'Insured-person lines with both contribution shares',
+      },
+      {
+        label: 'Professional Tax Register',
+        path: '/reports/statutory/pt-register',
+        icon: GavelRoundedIcon,
+        description: 'Who was taxed, on what, and how much',
+      },
+      {
+        label: 'TDS / Form 24Q',
+        path: '/reports/statutory/tds-24q',
+        icon: GavelRoundedIcon,
+        description: 'Quarterly TDS per employee with the month-wise split',
+      },
+      {
+        label: 'Gratuity Accrual',
+        path: '/reports/statutory/gratuity',
+        icon: GavelRoundedIcon,
+        description: 'Accrued liability per employee as at a date',
+      },
     ],
   },
 ];
@@ -57,13 +157,22 @@ export default function ReportsHub() {
               const Icon = item.icon;
               return (
                 <Grid key={item.path} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Card>
-                    <CardActionArea component={RouterLink} to={item.path}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardActionArea component={RouterLink} to={item.path} sx={{ height: '100%' }}>
                       <CardContent>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Icon color="primary" />
                           <Typography variant="body1">{item.label}</Typography>
                         </Box>
+                        {item.description && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 1, ml: 4.5 }}
+                          >
+                            {item.description}
+                          </Typography>
+                        )}
                       </CardContent>
                     </CardActionArea>
                   </Card>
