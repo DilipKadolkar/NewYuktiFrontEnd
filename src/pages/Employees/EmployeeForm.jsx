@@ -28,6 +28,7 @@ import companiesApi from '../../api/companies';
 import departmentsApi from '../../api/departments';
 import designationsApi from '../../api/designations';
 import categoriesApi from '../../api/categories';
+import employmentTypesApi from '../../api/employmentTypes';
 import { useActingAs } from '../../context/ActingAsContext';
 
 const emptyForm = {
@@ -38,6 +39,7 @@ const emptyForm = {
   departmentId: '',
   designationId: '',
   categoryId: '',
+  employmentTypeId: '',
   supervisorUserId: null,
   joiningDate: null,
   dateOfBirth: null,
@@ -77,6 +79,7 @@ export default function EmployeeForm() {
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [employmentTypes, setEmploymentTypes] = useState([]);
   const [loading, setLoading] = useState(isEdit);
   const [mastersLoaded, setMastersLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,11 +95,16 @@ export default function EmployeeForm() {
       departmentsApi.list(),
       designationsApi.list(),
       categoriesApi.list(),
-    ]).then(([c, d, des, cat]) => {
+      // Optional - a company that has not adopted configurable employment
+      // types has none, and every employee simply keeps their status-derived
+      // behaviour. An empty list must not block the form.
+      employmentTypesApi.list().catch(() => []),
+    ]).then(([c, d, des, cat, types]) => {
       setCompanies(c);
       setDepartments(d);
       setDesignations(des);
       setCategories(cat);
+      setEmploymentTypes(types);
       setMastersLoaded(true);
     });
   }, []);
@@ -122,6 +130,7 @@ export default function EmployeeForm() {
         departmentId: department?.id ?? '',
         designationId: designation?.id ?? '',
         categoryId: category?.id ?? '',
+        employmentTypeId: emp.employmentTypeId ?? '',
         supervisorUserId: emp.supervisorUserId,
         joiningDate: emp.joiningDate ? dayjs(emp.joiningDate) : null,
         dateOfBirth: emp.dateOfBirth ? dayjs(emp.dateOfBirth) : null,
@@ -177,6 +186,7 @@ export default function EmployeeForm() {
       departmentId: Number(form.departmentId),
       designationId: Number(form.designationId),
       categoryId: form.categoryId ? Number(form.categoryId) : null,
+      employmentTypeId: form.employmentTypeId ? Number(form.employmentTypeId) : null,
       supervisorUserId: form.supervisorUserId || null,
       joiningDate: form.joiningDate ? form.joiningDate.format('YYYY-MM-DD') : null,
       dateOfBirth: form.dateOfBirth ? form.dateOfBirth.format('YYYY-MM-DD') : null,
@@ -445,6 +455,38 @@ export default function EmployeeForm() {
                 ))}
               </TextField>
             </Grid>
+            {/* Optional, and only offered once a company has defined types
+                under Masters -> Employment Types. Left blank, payroll keeps the
+                built-in behaviour of the Employment status above, which is what
+                every existing employee has. */}
+            {employmentTypes.length > 0 && (
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Employment type (pay behaviour)"
+                  value={form.employmentTypeId}
+                  onChange={(e) => set('employmentTypeId', e.target.value)}
+                  helperText="Leave blank to pay this employee by their employment status, as before."
+                >
+                  <MenuItem value="">
+                    <em>Use the employment status</em>
+                  </MenuItem>
+                  {employmentTypes
+                    // An inactive type stays selectable for whoever is already
+                    // on it - hiding it would silently clear the assignment on
+                    // the next save - but is never offered to anyone else.
+                    .filter((t) => t.active || t.id === form.employmentTypeId)
+                    .map((t) => (
+                      <MenuItem key={t.id} value={t.id}>
+                        {t.typeName}
+                        {t.active ? '' : ' (inactive)'}
+                      </MenuItem>
+                    ))}
+                </TextField>
+              </Grid>
+            )}
             <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 select

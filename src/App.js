@@ -15,6 +15,7 @@ import Companies from './pages/Masters/Companies';
 import Departments from './pages/Masters/Departments';
 import Designations from './pages/Masters/Designations';
 import Categories from './pages/Masters/Categories';
+import EmploymentTypes from './pages/Masters/EmploymentTypes';
 import SalaryRule from './pages/Masters/SalaryRule';
 import AttendanceRule from './pages/Masters/AttendanceRule';
 import EmployeeList from './pages/Employees/EmployeeList';
@@ -37,6 +38,8 @@ import MyAttendance from './pages/Attendance/MyAttendance';
 import AttendanceConsoleLayout from './pages/Attendance/AttendanceConsoleLayout';
 import AttendanceGenerate from './pages/Attendance/Generate';
 import AttendanceRecords from './pages/Attendance/Records';
+import AttendancePolicyRules from './pages/Attendance/PolicyRules';
+import AttendancePolicyEffective from './pages/Attendance/PolicyEffective';
 import LeaveLayout from './pages/Leave/LeaveLayout';
 import LeaveApply from './pages/Leave/Apply';
 import MyLeaves from './pages/Leave/MyLeaves';
@@ -155,6 +158,7 @@ function App() {
               <Route path="departments" element={<Departments />} />
               <Route path="designations" element={<Designations />} />
               <Route path="categories" element={<Categories />} />
+              <Route path="employment-types" element={<EmploymentTypes />} />
               <Route path="salary-rule" element={<SalaryRule />} />
               <Route path="attendance-rule" element={<AttendanceRule />} />
             </Route>
@@ -174,6 +178,8 @@ function App() {
               <Route index element={<AttendanceGenerate />} />
               <Route path="generate" element={<AttendanceGenerate />} />
               <Route path="records" element={<AttendanceRecords />} />
+              <Route path="policy" element={<AttendancePolicyRules />} />
+              <Route path="policy-check" element={<AttendancePolicyEffective />} />
             </Route>
 
             <Route path="/leave/bulk-import" element={<BulkImportLeaves />} />

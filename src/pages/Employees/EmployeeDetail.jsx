@@ -351,6 +351,14 @@ export default function EmployeeDetail() {
                   value={emp.supervisorName ? `${emp.supervisorName} (${emp.supervisorUserId})` : 'None'}
                 />
                 <Field label="Employment status" value={labelize(emp.status)} />
+                {/* Null for every employee who has not been put on a
+                    configurable type - which is the norm, and means payroll
+                    follows the employment status above. Spelling that out beats
+                    a blank field somebody has to interpret. */}
+                <Field
+                  label="Employment type (pay behaviour)"
+                  value={emp.employmentTypeName || 'From employment status'}
+                />
                 <Field label="Gender" value={emp.gender ? labelize(emp.gender) : '-'} />
                 <Field
                   label="Joining date"

@@ -26,6 +26,18 @@ import IdleSessionGuard from '../components/IdleSessionGuard';
 
 const DRAWER_WIDTH = 260;
 
+// The Drawer's Paper defaults to `background.paper` (white). The sidebar navy
+// is painted on the content Box inside it, so once the nav list grew taller
+// than the viewport the Box stopped at 100% height and the scrolled remainder
+// exposed white Paper underneath — which is why it came and went with screen
+// size and role. Painting the Paper keeps the column navy at any height.
+const drawerPaperSx = {
+  width: DRAWER_WIDTH,
+  border: 'none',
+  bgcolor: 'sidebar.background',
+  color: 'sidebar.text',
+};
+
 function SidebarContent({ isPlatform, role }) {
   const location = useLocation();
   const config = isPlatform ? platformNavConfig : navConfig;
@@ -33,7 +45,7 @@ function SidebarContent({ isPlatform, role }) {
   const visible = (item) => !item.visibleFor || item.visibleFor.includes(role);
 
   return (
-    <Box sx={{ bgcolor: 'sidebar.background', height: '100%', color: 'sidebar.text' }}>
+    <Box sx={{ bgcolor: 'sidebar.background', minHeight: '100%', color: 'sidebar.text', pb: 2 }}>
       <Box sx={{ px: 3, py: 3 }}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>A</Avatar>
@@ -202,7 +214,7 @@ export default function AppLayout() {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, border: 'none' },
+            '& .MuiDrawer-paper': drawerPaperSx,
           }}
         >
           <SidebarContent isPlatform={isPlatform} role={role} />
@@ -211,7 +223,7 @@ export default function AppLayout() {
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, border: 'none' },
+            '& .MuiDrawer-paper': drawerPaperSx,
           }}
           open
         >

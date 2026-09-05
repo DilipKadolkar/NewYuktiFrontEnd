@@ -995,3 +995,441 @@ MyAttendance changes with no console errors (checked via the already-running
 logging into the running app to click through the totals line and dated
 in/out columns for real - same credential constraint as every other section
 here; the user confirmed the hours-formatting change directly instead.
+
+---
+
+## 16. Attendance policy engine + configurable employment types, in the UI (2026-09-01)
+
+Two backend features landed that had no frontend at all. Both are additive and
+both ship **off**: a company that configures nothing sees exactly the app it saw
+before, and is paid exactly what it was paid before. That property is the whole
+design of both features, and the UI is built to preserve it — every new
+indicator on an existing screen is hidden until it has a number to show.
+
+Source of truth read before writing any of this, in this order:
+`Accusharp/docs/design/attendance-policy-engine.md` (the engine, 1083 lines),
+`Accusharp/docs/design/dynamic-configuration.md` (why employment types became a
+table), `Accusharp/Attendance.md` §11 (the operator-facing version), and then the
+controllers, DTOs and services themselves — the design docs describe an
+approved design, and §15 of the first one records where the build deviated from
+it. Where the two disagreed, the **code** won.
+
+### 16a. What the backend actually added
+
+**The attendance policy engine.** Attendance policy used to be one setting for
+everybody: the shift's grace, and two company-wide thresholds on
+`attendance_rule`. Late minutes were recorded and then read by nothing at all —
+no status, no day fraction, no LOP day, no rupee depended on them. That hole is
+what this fills. Policy is now a stack of typed rules resolved per employee per
+date, over seven rule types:
+
+| Rule | Scope | Decides |
+|---|---|---|
+| `MISSING_PUNCH` | day | A lone punch that looks like an arrival becomes a half day instead of `INVALID_PUNCH` |
+| `SHORT_HOURS` | day | The full/half-day cut-offs, as a share of the shift **or absolute minutes**, per group |
+| `LATE_ARRIVAL` | day | Grace, and what a late arrival costs |
+| `DAY_OFF_WORK` | day | Whether a worked weekly off earns overtime or a comp-off credit |
+| `OVERTIME` | day | Who earns overtime, after how long, in what blocks |
+| `EARLY_EXIT_BUDGET` | **month** | A monthly budget of early-exit minutes, then a penalty per occurrence |
+| `LATE_MARK_ACCUMULATION` | **month** | Nth late mark in a month costs a fraction of a day |
+
+Three properties of the API shape the UI more than anything else:
+
+1. **There is no `PUT`.** A rule is never edited. Changing one appends a version
+   with a later `effectiveFrom`; ending one appends a version with
+   `enabled = false`. `DELETE` only accepts a version that has not started yet.
+   So the screen has no Edit button — it has "Change (saves a new version)" and
+   "Stop", and it can show the whole history.
+2. **`enabled = false` is an answer, not a gap.** Resolution still picks the
+   disabled row, and a broader rule does **not** take over. "Managers are not
+   tracked for lateness" is a disabled `LATE_ARRIVAL` at `CATEGORY=MANAGER`.
+   The UI says this in as many words in three places, because the intuitive
+   reading is the opposite.
+3. **`POST /preview` re-runs a real past month and writes nothing.** This is the
+   only defence against the misconfiguration the design document calls the most
+   damaging one available (see 16d), so it is not a separate page somebody might
+   never find — it is step 5 of the save flow.
+
+New permissions `ATTENDANCE_POLICY_READ` / `ATTENDANCE_POLICY_MANAGE`, granted
+to HR and ADMIN only (deliberately not SUPERVISOR — deviation #2 in the design
+doc's §15).
+
+**Configurable employment types.** `EmployeeStatus.isPaidPerAttendedDay()` — one
+enum constant — drove seven separate branches in `PayrollService.build`: the
+proration base, whether LOP applies, how payable days derive, whether paid leave
+adds to them, the stored `presentDays`, the overtime basis, and whether a
+mid-month revision is segmented. A company could change the *numbers* those
+branches used but never the *behaviour*, and could not add a fifth type at all.
+`employment_type` makes each of those a field on an editable row. `PayBasis` and
+`OvertimeBasis` stay closed enums of two — unlimited types composed from a
+bounded vocabulary, which is the line `dynamic-configuration.md` §2 draws and
+explains.
+
+`Employee.employmentType` is **nullable**, and null falls back to the legacy
+`EmployeeStatus` semantics. Adoption is opt-in per employee. New permissions
+`EMPLOYMENT_TYPE_READ` / `EMPLOYMENT_TYPE_MANAGE`.
+
+**Monthly summary gained two columns**, surfaced on
+`GET /api/attendance/{userId}/monthly` only:
+`policyLopDays` (the share of `lopDays` somebody *chose*, as against the share
+the working-days arithmetic produced) and `compOffCreditDays`, plus a
+`policyOutcomes` array carrying one stored explanation sentence per month-rule
+penalty.
+
+### 16b. What was built, file by file
+
+**New API modules**
+
+- `api/employmentTypes.js` — the standard CRUD factory plus `seedDefaults()`.
+- `api/attendancePolicy.js` — `list`, `create`, `remove`, `effective`,
+  `preview`. No `update`, matching the backend, with the reason in a comment so
+  nobody adds one later.
+
+**New constants**
+
+- `constants/attendancePolicy.js` — the human half of the rule catalog. Every
+  numeric bound in it matches a bean-validation annotation in
+  `AttendancePolicyParams`, so a form built from it cannot compose a rule the
+  server rejects on a technicality. What it adds is what the enum cannot carry:
+  a one-line summary, a paragraph of detail, a "what it changes" line, the
+  danger text for the one rule that warrants one, sensible defaults, and a
+  `describe()` per type that renders stored params as one plain sentence.
+  The scope list deliberately **omits `GLOBAL`** — it exists on the backend as a
+  hook for a future shared catalog that ships empty, and a company creating one
+  would only get a confusingly-named lowest-priority company rule.
+- `constants/enums.js` — `PAY_BASIS` / `OVERTIME_BASIS` and, more usefully,
+  `*_LABEL` and `*_HELP` maps. `labelize('PER_CALENDAR_DAY_LESS_LOP')` gives
+  "Per calendar day less lop", which is accurate and says nothing to the payroll
+  clerk who has to choose between the two options.
+- `constants/permissions.js` — the four new codes added to the HR/ADMIN grant
+  list and to `PERMISSION_CODES` (which drives the custom-role checklist), in
+  the same positions the backend's `PermissionCode` enum puts them.
+
+**New pages**
+
+- `pages/Masters/EmploymentTypes.jsx` — a sixth Masters tab at
+  `/masters/employment-types`. Not `MasterCrudPage`: this master has switches,
+  two selects whose choices change what the other fields mean, and a
+  cross-field rule the backend refuses outright, none of which
+  `MasterFormDialog` models. Table shows code, name, pay basis and overtime
+  basis as plain English with the technical explanation on hover, the monthly
+  base (or "Company default"), the behaviour flags as chips, and active state.
+- `pages/Attendance/PolicyRules.jsx` — a third Attendance Console tab at
+  `/attendance/policy`. Lists rules grouped into chains, showing only the
+  current version of each by default with a "Show past versions" switch.
+- `pages/Attendance/PolicyRuleDialog.jsx` — the add/change flow, five numbered
+  steps (16d).
+- `pages/Attendance/PolicyEffective.jsx` — a fourth tab at
+  `/attendance/policy-check`, "Who gets which rule". Pick a person and a date;
+  get the winning rule per type, the sentence saying *why* it won, and — the
+  point of the endpoint — the rules that matched and lost, collapsed. Without
+  those, "why isn't my department's rule applying?" has no answer anywhere.
+
+**Changed pages**
+
+- `pages/Attendance/MyAttendance.jsx` — a `PolicyOutcomes` card rendering the
+  stored explanation sentence for each month-rule penalty plus any comp-off
+  earned, on both the HR table view and the plain-employee card view; and two
+  extra stat cards ("of which, policy penalties", "Comp-off earned") on the HR
+  view. **All three render only when they have a non-zero figure**, so a company
+  with no policy rules sees precisely the screen it saw yesterday.
+- `pages/Employees/EmployeeForm.jsx` — an "Employment type (pay behaviour)"
+  select in the Organisation card, next to Employment status. The whole field is
+  hidden when the company has defined no types, so nobody is asked about a
+  concept they have not adopted. Blank means "use the employment status", spelt
+  out in the helper text rather than left as an empty option.
+- `pages/Employees/EmployeeDetail.jsx` — the same field, read-only, rendering
+  "From employment status" rather than a blank when unset.
+- `pages/Attendance/AttendanceConsoleLayout.jsx` / `pages/Masters/MastersLayout.jsx`
+  / `App.js` — the new tabs and routes.
+
+### 16c. One backend change was necessary, and it fixes a live data-loss bug
+
+`EmployeeResponse` did not expose the employment type, but `EmployeeRequest`
+carries `employmentTypeId` and `EmployeeService.apply` applies it
+unconditionally:
+
+```java
+employee.setEmploymentType(request.getEmploymentTypeId() == null ? null
+        : employmentTypeService.getById(request.getEmploymentTypeId()));
+```
+
+A client that cannot read the current value back has no way to send it again.
+So **every ordinary employee edit — changing a phone number, fixing a bank
+account — silently clears the employment type**, and with it the pay behaviour.
+This is true of the app as it stands today, before any of this work: it is
+invisible only because there was no UI to set the field in the first place.
+
+Adding a write-only picker to the form would have shipped a feature that
+destroys its own data on the next save, so two lines went into the backend:
+
+- `dto/EmployeeResponse.java` — `Long employmentTypeId`, `String employmentTypeName`.
+- `mapper/EmployeeMapper.java` — the two null-safe reads, next to the `category`
+  read that already proves the mapper runs inside a transaction (both
+  associations are `FetchType.LAZY`).
+
+Purely additive: no existing field moved, no existing consumer changed, and
+`EmployeeResponse` has exactly one construction site. `./mvnw compile` clean.
+
+### 16d. The design decisions that were about the audience, not the API
+
+The people using this screen configure payroll; they do not read Javadoc. Four
+choices follow from that, and each one is a deliberate departure from simply
+rendering the API.
+
+**The month test is step 5 of saving, not a separate page.** The design document
+is blunt about the worst thing this engine can do: a `LATE_ARRIVAL` rule with
+`penaltyStatus: ABSENT` and a small grace, scoped at `COMPANY`, turns everybody
+who arrives at 09:06 into a full unpaid day — on a day they worked in full. It
+is worse than the old `overtime_window_minutes = 0` bug for one specific reason:
+that one produced `INVALID_PUNCH`, which is visibly wrong and shows up in the
+summary, while this produces `ABSENT`, which is exactly what a genuinely absent
+day looks like. Nothing in the month's figures says anything went wrong.
+
+So `POST /preview` is inlined into the dialog, defaulting to **last** month
+(this month is usually half-generated), and it reports employees checked,
+employees affected, the LOP delta, the overtime delta, the server's own
+warnings, and the first eight affected employees with their changed days and
+reasons. Selecting `ABSENT` as the penalty also raises a written warning in the
+form itself, before the test is even run.
+
+One detail worth keeping: the preview endpoint **replaces** the stored rule set
+rather than merging with it, so sending only the draft would answer a question
+nobody asked. `PolicyRules` therefore fetches its list **unfiltered** — the
+rule-type filter is applied client-side to the table only — and the dialog
+previews *every rule currently in force, with the draft added or replacing its
+own predecessor*. That is the month as it would actually be after saving.
+
+**Append-only history is shown as append-only, not disguised as editing.** The
+Edit icon is captioned "Change — saves a new version, keeps the old one", the
+dialog opens with "This adds version N+1 — it does not edit version N", and
+Stop's confirmation says days already worked out keep their result and no wider
+rule will take over. Hiding the versioning behind a familiar-looking Edit button
+would have been friendlier and would have made the first "why did last month
+change?" conversation impossible to have.
+
+**Every rule type is explained where it is chosen.** Selecting a rule renders
+its summary, its detail paragraph, an explicit "What it changes" line, and a
+chip saying whether it is worked out day by day or once a month — with the
+month-scope consequence stated outright: a start date mid-month means it governs
+from the **following** month. That is deviation #1 in the design doc's §15,
+it has no visible signal anywhere else, and somebody will otherwise set a rule
+on the 15th and spend two weeks wondering why nothing happened.
+
+**Illegal combinations are made unreachable rather than rejected.** On the
+employment type form, choosing "Paid per day attended" switches LOP off and
+disables it, with the reason in place of the help text ("the days not worked are
+already unpaid, so deducting again would charge the same absence twice");
+choosing the monthly basis clears and disables the monthly base. Both mirror
+`EmploymentTypeService.validate()` exactly, so the guard is a disabled control
+with an explanation rather than a 400 after the fact.
+
+### 16e. Client-side validation the backend does not have
+
+`SHORT_HOURS` is bean-validated field by field but the two values are never
+compared, and `halfDayValue >= fullDayValue` makes the half-day branch
+unreachable — short days silently become `ABSENT`. The design document listed
+`halfDayValue must be less than fullDayValue` as a refusal; the implementation
+does not have it. The form blocks it with that message. `DAY_OFF_WORK`'s
+`halfCreditMinutes > fullCreditMinutes` is the same shape and is blocked the
+same way. **Both are worth adding to `AttendancePolicyParamsCodec.validate`** —
+the UI guard only covers callers that come through this app.
+
+### 16f. Known gaps, in the order they are likely to matter
+
+1. **Bulk employee import cannot set an employment type.** `EmployeeCsvParser`
+   has no such column, so the xlsx template in `utils/employeeTemplate.js` has
+   none either. Onboarding a company onto configurable types today means editing
+   employees one at a time. Backend work.
+2. **Per-day policy trace is not surfaced anywhere.** `attendance_policy_application`
+   holds one row per day per rule that changed something, with the rendered
+   sentence, but `DailyAttendanceResponse` does not carry it —
+   §9 of the design doc says `GET /records` "gains a `policyApplications` array
+   per day"; the implementation did not add it. So Records shows *that* a day is
+   a half day, and the month view explains only the month-scoped penalties. The
+   day-level "why" exists in the database and cannot be reached from the UI.
+   Backend DTO change, small.
+3. **`GET /api/employment-types` has no `shared` flag.** `EmploymentType.company`
+   is `@JsonIgnore`, so the UI cannot tell a company-owned row from a shared
+   catalog row, and editing a shared one 404s with no forewarning. In practice
+   every row a company sees is its own, because `seed-defaults` creates
+   company-owned rows for any caller with a company and the shared catalog ships
+   empty — but `AttendancePolicyDtos.RuleResponse` already carries exactly this
+   `shared` boolean, and the employment type response should too.
+4. **`EMPLOYMENT_TYPE` policy scope means the built-in status, not the new
+   master.** `assertScopeRefExists` validates that `scopeRef` against
+   `EmployeeStatus`, so a rule scoped there matches on `Employee.status` and not
+   on the assigned employment type. The two names being near-identical is a real
+   trap; the scope's help text says so explicitly. Worth renaming one of them.
+5. **Comp-off is recorded, not bookable.** There is no comp-off leave type to
+   accrue into (section B of `dynamic-configuration.md`, not built), so the UI
+   reports the credit and says so rather than implying a balance exists.
+6. **No frontend tests.** Consistent with the rest of this codebase, which has
+   none — noted, not defended.
+
+### 16g. Verification
+
+**Done.** `CI=true npx react-scripts build` — compiles clean, zero warnings
+(CI mode treats warnings as errors, so this is a real gate). `./mvnw compile`
+on the backend — clean, for the two-line `EmployeeResponse`/`EmployeeMapper`
+change. Every request and response shape used here was checked field by field
+against the controllers and DTOs rather than against the design documents,
+which describe an approved design the implementation deviated from in six
+recorded places.
+
+Also fixed while here: `AttendanceConsoleLayout` picked its active tab with
+`TABS.find(t => pathname.startsWith(t.path))`, which lights up **Policy** when
+you are on `/attendance/policy-check`. Now takes the longest match.
+
+**Superseded by 16h — this was written before the live run.** The paragraph below is kept because the `pom.xml` finding in it is still true and still worth fixing.
+
+**Not done at the time of writing: nothing was clicked through in a running app.** The documented
+H2 quick start in §1 does not work on this checkout —
+`./mvnw spring-boot:run -Dspring-boot.run.profiles=h2` dies with
+`Cannot load driver class: org.h2.Driver`, because `pom.xml` puts the H2
+`<excludes>` block in the `spring-boot-maven-plugin`'s **plugin-level**
+`<configuration>` rather than inside the `repackage` execution, so it strips H2
+from `spring-boot:run`'s classpath as well as from the jar. The comment above it
+says "leaving it available for local dev and tests"; it does not. Moving those
+four lines into `<executions><execution><id>repackage</id>` fixes it. A backend
+instance was already running on :8080 against MySQL `julytesting` and was left
+alone. So the risks that remain are the ones a compiler cannot see: a rendering
+bug, a layout problem on a narrow screen, or a payload the server rejects at
+runtime for a reason the DTOs do not state.
+
+**The five minutes that would retire most of that risk**, once a company with
+generated attendance is available:
+
+1. Masters → Employment Types → **Set up standard types**. Four rows appear.
+   Edit `DAY_WISE`; the monthly base is editable and LOP is disabled with its
+   reason showing.
+2. Employees → edit anyone → Organisation. The new select appears. Set it, save,
+   reopen — it must still be set (this is 16c).
+3. Attendance Console → Policy → Add rule → *Late arrival penalty*, category
+   scope, grace 15, penalty Half day → **Run the test** against a month that has
+   attendance. Confirm the numbers, then set the penalty to Absent and confirm
+   both the in-form warning and the server's own warning appear.
+4. Save it. Confirm the row reads "In force" / "v1". Hit Change, save v2, switch
+   "Show past versions" on and confirm v1 is there marked Replaced.
+5. Attendance Console → Who gets which rule → that employee, a date after the
+   rule started. Confirm the rule shows as applying, and that a second, broader
+   rule of the same type appears under "matched but lost".
+6. My Attendance → that employee, that month. With a month rule configured and
+   fired, the "Policy applied this month" card and the "of which, policy
+   penalties" stat appear. With no rules configured, **neither must appear at
+   all** — that is the property the whole feature rests on.
+
+
+### 16h. Verified live, end to end (2026-09-02)
+
+Everything in 16g's "not done" list was subsequently done. A clean backend was
+booted on **port 8081** against a file-based H2, leaving the instance already
+running on :8080 untouched, and the dev server was pointed at it on :3001. Two
+obstacles and how they were got round, because both will be hit again:
+
+- **`spring-boot:run -Dspring-boot.run.profiles=h2` still does not work** (the
+  `pom.xml` plugin-level `<excludes>` described in 16g). Worked round without
+  touching `pom.xml` by running the app off the plain dependency classpath,
+  which *does* carry H2 at runtime scope:
+  `./mvnw dependency:build-classpath -Dmdep.outputFile=cp.txt` then
+  `java -cp "target/classes:$(cat cp.txt)" -Dspring.profiles.active=h2 ...`.
+- **The app refuses to boot with placeholder secrets** — `JWT_SECRET` and
+  `HRMS_SEED_PLATFORM_OWNER_PASSWORD` must both be set to real values. Both
+  guards behaved exactly as designed and are a good thing; noting them so the
+  next person does not read the stack trace as a failure.
+
+#### The scenario
+
+Four employees, **identical punches every day** (in 09:30, out 18:00, ten
+working days of August 2026, loaded straight into `device_logs`), differing only
+in category and employment status. Then four `LATE_ARRIVAL` rules, one per
+population, all effective 2026-08-01:
+
+| Rule scope | Grace | Penalty |
+|---|---|---|
+| `COMPANY` | 5 min | Half day |
+| `CATEGORY=WORKER` | 10 min | Half day |
+| `CATEGORY=STAFF` | — | **disabled** |
+| `EMPLOYMENT_TYPE=DAY_WISE` | 45 min | Half day |
+
+#### What actually happened
+
+Before any rule existed, all four employees produced byte-identical months:
+`presentDays 10.0, lopDays 16.0, policyLopDays 0, overtime 5.0`, every worked
+day `PRESENT`. That is the no-op property holding on real data.
+
+After the rules, on the same punches:
+
+| User | Category | Status | Rule that won | Worked days | Present | LOP |
+|---|---|---|---|---|---|---|
+| `STF001` | STAFF | Permanent | STAFF rule, **disabled** → nothing applies | 10 × `PRESENT` | 10.0 | 16.0 |
+| `WRK001` | WORKER | Permanent | `CATEGORY=WORKER`, 10 min | 10 × `HALF_DAY` | 5.0 | 21.0 |
+| `SUP001` | SUPERVISOR | Permanent | `COMPANY`, 5 min (no category rule) | 10 × `HALF_DAY` | 5.0 | 21.0 |
+| `DWK001` | (none) | **Day wise** | `EMPLOYMENT_TYPE=DAY_WISE`, 45 min | 10 × `PRESENT` | 10.0 | 16.0 |
+
+Same shift, same punches, four different bills. `SUP001` falling through to the
+company rule and `DWK001` being caught by the employment-status rule are the two
+that prove the precedence chain rather than just the happy path.
+
+**The preview predicted this before anything was written.** `POST /preview` over
+the same rule set returned `checked=4 affected=2 lopDelta=10.0`, named `WRK001`
+and `SUP001` with `lop 16.0 → 21.0` each, gave the per-day reason
+(`HALF_DAY: in 09:30, 20 min beyond a 10 min grace on a 09:00 shift, rule
+LATE_ARRIVAL v0 scoped CATEGORY=WORKER`), and raised its own warning: *"this
+rule set adds 10.0 LOP days across 2 of 4 employees - check that is intended
+before saving it."* The regeneration afterwards matched the prediction exactly.
+
+**A month-scoped rule was then added** (`EARLY_EXIT_BUDGET` @ `CATEGORY=STAFF`,
+60 min budget, 0.5 day per later occurrence). `STF001` went to
+`lopDays 20.5 / policyLopDays 4.5`, with the stored sentence *"600 min of early
+exit across 10 day(s) against a 60 min monthly budget; budget exhausted
+2026-08-03; 9 later early exit(s) … penalised at 0.5 day each = 4.5 LOP days"*.
+`WRK001` was untouched by it. Note this rule fired on `earlyExitMinutes`, a
+figure the application recorded and read nowhere before the engine existed.
+
+#### Screens confirmed in the browser
+
+- **Attendance → Policy** — all five rules listed with the plain-English
+  description, the population ("A category (grade) STAFF", "An employment status
+  DAY_WISE", "Everyone in the company"), In force / Stopped, version, and
+  day-vs-month scope.
+- **Attendance → Who gets which rule** — for `WRK001`: the identity chips, the
+  company-wide thresholds it sits on, `Late arrival penalty · Applies ·
+  "More than 10 min late makes the day a half day" · Why: most specific match:
+  CATEGORY=WORKER`, and the expanded loser: *"Everyone in the company (v1, from
+  01 Aug 2026) — More than 5 min late makes the day a half day."* For `STF001`:
+  `Not configured` with *"Why: the most specific match (CATEGORY=STAFF) is
+  disabled, so this rule type does not apply to this employee"* — the "disabled
+  is an answer, not an absence" rule, in words an employee could be shown.
+- **My Attendance, signed in as `STF001` (a plain EMPLOYEE)** — the
+  "Policy applied this month" card with *"Monthly early-exit budget — 4.5 unpaid
+  day(s)"* and the full stored explanation. On September, which has no outcomes,
+  the card is correctly **absent**.
+
+#### Two real bugs the live run caught
+
+1. **`display="block"` on `Typography` does nothing in MUI 9.** It was a v5
+   system prop; MUI 9 drops it, so eleven captions across `PolicyEffective` and
+   `PolicyRuleDialog` rendered as inline `<span>`s and ran into the following
+   line — on screen this read
+   `"… workers get 10 minWhy: most specific match…"`. Changed to
+   `sx={{ display: 'block' }}`, which is what the rest of this codebase already
+   uses (e.g. `Records.jsx:141`). **Worth grepping for on any new page.**
+2. **`EmployeePicker` had no minimum width** and collapsed to a ~40px box
+   reading "Employ…" inside the flex `Stack` that every `PageHeader` puts its
+   actions in — it has no natural width of its own the way the date pickers
+   beside it do. Given `sx={{ minWidth: 240 }}`. This is **pre-existing** and
+   affects Records, MyAttendance and the roster screens too, so the fix is an
+   improvement to all of them rather than only to the new page.
+
+Neither was catchable by a compiler, which is exactly why 16g flagged them as
+the residual risk.
+
+#### Still not exercised
+
+The **Add rule dialog** was not driven through the browser — the rules above
+were created over the API. Its five steps, the in-form `ABSENT` warning, and the
+"Run the test" panel are therefore verified only at the level of the endpoints
+they call (all four of which were exercised directly) and a clean compile. The
+same is true of the **Employment Types** master. Both are the obvious next thing
+to click through.
