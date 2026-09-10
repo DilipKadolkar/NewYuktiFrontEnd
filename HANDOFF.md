@@ -271,6 +271,7 @@ a successful change — there is no "stay logged in" option, by design.
 | Payroll | `/payroll/generate`, `/generate-all`, `/list`, `/history` |
 | Salary Slips | `/salary-slips`, `/salary-slips/me` |
 | Reports | `/reports` (hub) + 13 sub-routes under `/reports/*` |
+| Contractors | `/contractors/list`, `/workforce`, `/roster`, `/attendance`, `/reports` — see §17 |
 | Custom Roles | `/roles` (ADMIN-only), `/roles/:id` |
 | Audit Log | `/audit-logs` (company ADMIN + platform) |
 | Platform | `/platform/companies` (full Companies CRUD), `/platform/onboard` |
@@ -1433,3 +1434,471 @@ were created over the API. Its five steps, the in-form `ABSENT` warning, and the
 they call (all four of which were exercised directly) and a clean compile. The
 same is true of the **Employment Types** master. Both are the obvious next thing
 to click through.
+
+---
+
+## 17. Labour contractors: a separate workforce, a shared shift catalog (2026-09-06)
+
+A client company engages labour contractors and does not care what those
+contractors pay their people — it cares that they turned up. This section adds
+the whole loop for that: onboard the contractor, register the workers they
+deploy, roster those workers onto our shifts, generate their attendance, and
+hand the contractor a report they run their own payroll from.
+
+### 17a. The design decision everything else follows from
+
+**A contractor's worker is an `Employee` row with a `contractor_id`, not a row
+in a new table.** `ShiftSchedule`, `DailyAttendance`, `DeviceLog` and
+`MonthlyAttendanceSummary` are all keyed by the plain `user_id` *string*, and
+`Employee.userId` is unique platform-wide precisely because the biometric feed
+resolves a punch by it alone. A parallel worker table would have had to either
+share that key space anyway — reintroducing the collision the global constraint
+exists to prevent — or grow a second copy of the attendance engine. One
+nullable foreign key buys the punch window, the night-shift handover, the
+policy engine, HR corrections and payroll locking unchanged.
+
+The cost is that "every employee of this company" now means two things, and
+the feature turns entirely on getting that right. Full rationale in
+[ARCHITECTURE.md](../../Accusharp/ARCHITECTURE.md)'s "Labour contractors"
+section; the short version is that `EmployeeService.getActiveEntities()` and
+`getAllEntities()` were already the single choke points every company-wide
+operation resolved its population through, and both now filter
+`contractor IS NULL`. Payroll, the dashboard, `ReportScope` (and therefore
+every statutory return), the employee directory and the shift planner all
+exclude contractor workers without any of them being edited.
+
+### 17b. Backend
+
+New: `Contractor` entity, `Employee.contractor`, `ContractorRepository`,
+`ContractorService` / `ContractorEmployeeService` / `ContractorAttendanceService`
+(`service/contractor`), `ContractorAttendanceReportService` (`service/report`),
+`ContractorController`, `ContractorMapper`, and the request/response DTOs.
+`CONTRACTOR_READ` / `CONTRACTOR_MANAGE` join `PermissionCode` and the seeder.
+
+Three things worth carrying forward:
+
+1. **`ContractorEmployeeRequest` has no salary, statutory, bank or `role`
+   field.** Not "ignored if supplied" — *absent*, which is what makes them
+   unsettable rather than a comment asking callers not to. The service
+   additionally pins `role = EMPLOYEE`, `accountEnabled = false` with no
+   password hash, and `status = CONTRACT`.
+2. **That `status = CONTRACT` is load-bearing.** `DefaultRosterService` reads
+   `EmployeeStatus` to decide who gets a free `GENERAL` roster two months
+   ahead; a contractor's workers must not, because they are on site only for
+   the days their contractor sends them. Auto-rostering would manufacture
+   absent days — and therefore an invoice dispute — for days nobody was
+   expected. Same reason `includeUnrostered` defaults to **false** for a
+   contractor run and **true** for the company console.
+3. **The employee endpoints now 404 a contractor's worker on every write**
+   (`getCompanyEmployeeById`), so `PUT /api/employees/{id}` can never write an
+   `EmployeeRequest` — gross salary, derived structure, a `role` — over
+   somebody this company does not pay.
+
+`ContractorWorkforceHttpTest` (11 tests) pins the isolation properties
+specifically, because a regression in any of them is silent in production
+until a payslip is generated for somebody else's employee.
+
+### 17c. Frontend
+
+`src/api/contractors.js` and five pages under `src/pages/Contractors/`, behind
+`ContractorsLayout`'s tab bar at `/contractors/*`, plus `ContractorPicker` in
+`components/`. Its own nav section rather than a row under HR Admin: SUPERVISOR
+can see it (they hold `CONTRACTOR_READ` and are the ones assigned to these
+workers) while the rest of HR Admin is HR/ADMIN only.
+
+| Page | What it is |
+|---|---|
+| `ContractorList` | CRUD over the agencies. Deactivate is refused while workers are still on site — the API 409s and the snackbar shows why |
+| `ContractorWorkforce` | Every contractor's workers in one table, **contractor name as the first column**, filterable to one. Defaults to all: a company with three agencies wants the whole deployed headcount before it narrows |
+| `ContractorRoster` | The company shift catalog, one contractor's workers. Never both populations in one grid — `plannerScope(supervisorUserId, contractorId)` returns one or the other |
+| `ContractorAttendance` | The same generate/preview flow as the company console, scoped to one contractor |
+| `ContractorReports` | Monthly summary, daily register, and all-contractors — the last being the side-by-side view a multi-contractor company reads |
+
+Exports are server-rendered (`responseType: 'blob'`), not a dump of the grid,
+because the monthly sheet appends the contractor's totals below the rows — the
+figure they invoice against has to travel in the same file as the rows it came
+from.
+
+### 17d. What was verified
+
+Driven in the browser against a real backend (H2 profile) with two contractors
+and five workers:
+
+- onboarding a contractor through the dialog, and the list rendering it;
+- the workforce table showing both agencies' workers with the contractor name
+  against each;
+- the contractor roster planner showing **only** the selected contractor's
+  three workers, rostered `GENERAL` with Sunday week-offs;
+- generate + preview reporting "3 workers processed, 90 days";
+- the monthly report, its header card (contact person and email — the people
+  the report is sent to), and the all-contractors table listing both agencies
+  with their totals;
+- **the isolation, positively**: `/employees`, `/reports/employees`, the
+  company `/roster/planner` and a company-wide `POST /api/attendance/generate`
+  each returned exactly the three own-staff records and none of the five
+  contractor workers.
+
+343 backend tests pass, and `CI=true react-scripts build` is clean.
+
+### 17e. Not done
+
+- **No punch data was exercised.** The local instance has no biometric feed, so
+  every generated day came back `ABSENT` — correct behaviour, but it means the
+  hours/overtime columns on the reports were verified as zeros rather than
+  against real punches. Worth re-running once `device_logs` has rows.
+- **No CSV bulk import for contractor workers.** The four existing bulk
+  endpoints share one shape (`ParsedCsvRow` + `BulkImportResult`); a fifth for
+  this would slot straight in and is the obvious next addition — onboarding 200
+  workers one dialog at a time is the first thing a real site will complain
+  about.
+- **Contractor workers have no leave.** They have no login and no balance, so
+  the leave module simply never sees them. If a contractor's workers should be
+  able to take approved paid leave that affects the attendance report, that is
+  a deliberate design decision nobody has made yet.
+- **The `h2` profile does not start as documented** (pre-existing, unrelated to
+  this work): `spring-boot-maven-plugin`'s `<excludes>` for `com.h2database` is
+  configured at plugin level, so it applies to `spring-boot:run` as well as
+  `repackage` and the driver is not on the classpath. Workaround used here was
+  `-Dspring-boot.excludes=`; the real fix is moving the exclusion inside the
+  `repackage` execution.
+
+---
+
+## 18. A public marketing site in front of the login (2026-09-06)
+
+### 18a. The problem this solves
+
+Visiting the app's root put a visitor straight on the sign-in card. That is
+correct for a user, and wrong for a demo — a prospect being shown the product
+had no page that said who AccuSharp is or what the system does before being
+asked for credentials.
+
+Four public pages now sit in front of the login: **Home**, **Services**,
+**About us** and **Contact**. Nothing about the application itself changed.
+
+### 18b. Scope discipline
+
+No application functionality was touched. Specifically: no API module, no
+`AuthContext`, no `RequireRole`, no `navConfig`, no permission semantics, no
+page under `src/pages/` other than the new `Site/` folder, and no change to
+the sign-in flow itself. The public pages make **zero** network calls — they
+render static copy from one file and nothing else. The only edits to existing
+files are the three below.
+
+### 18c. What was added
+
+| File | Role |
+|---|---|
+| `src/content/siteContent.js` | **All** public copy — the only file to edit to change what the site says |
+| `src/layout/SiteLayout.jsx` | Public header (sticky, mobile drawer) + footer + `<Outlet/>` |
+| `src/pages/Site/ui.jsx` | Shared primitives: `Section`, `SectionHeading`, `FeatureCard`, `IconTile`, `CtaBand`, icon-name map |
+| `src/pages/Site/PageHero.jsx` | Compact hero for the three inner pages |
+| `src/pages/Site/Home.jsx` | Hero + stats + module strip + why-us + how-it-works + compliance + who-it's-for + CTA |
+| `src/pages/Site/Services.jsx` | The ten product modules, the six engagement services, statutory compliance |
+| `src/pages/Site/About.jsx` | Story, mission, values, by-the-numbers, optional leadership |
+| `src/pages/Site/Contact.jsx` | Enquiry form (mailto), contact details, what-happens-next |
+
+### 18d. The three edits to existing files
+
+1. **`src/App.js`** — four public routes added inside a `<Route element={<SiteLayout/>}>`
+   block, placed *before* `/login`. The protected route tree below it is
+   byte-for-byte what it was.
+2. **`src/components/ProtectedRoute.jsx`** — one line. An unauthenticated
+   visitor at `/` now goes to `/home` instead of `/login`; **any other**
+   protected path still goes to `/login` exactly as before. An authenticated
+   user at `/` is unaffected — `RootRedirect` still runs and still routes
+   platform principals to `/platform/companies` and plain employees to
+   `/attendance/me`.
+3. **`src/pages/Auth/Login.jsx`** — a "← Back to home" link under the card.
+   Purely navigational; the form, the submit handler and the `initializing` /
+   `isAuthenticated` branches are untouched.
+
+### 18e. Design decisions worth knowing
+
+- **Same design tokens as the app.** The site imports nothing of its own —
+  teal accent, navy (`sidebar.background`), the card border/shadow treatment
+  and the type scale all come from `src/theme/theme.js`. A visitor who signs
+  in lands somewhere that looks like the site they just left.
+- **No images, anywhere.** The hero's "product preview" is composed from MUI
+  boxes rather than a screenshot, so there is no asset to keep in sync with a
+  UI that is still changing, and it stays crisp at any size. Nothing loads
+  from a CDN.
+- **Every number on the site is countable in the codebase.** 27 reports (the
+  lazy imports in `App.js`), 10 modules, 6 roles, 5 statutory heads. No
+  invented customer counts, no invented uptime figure.
+- **Fake customers cannot appear by accident.** `testimonials` and
+  `about.leadership` are empty arrays, and both sections return `null` while
+  empty. Fill them in and the section appears; leave them and a demo shows
+  nothing invented.
+- **The contact form posts nowhere.** It composes a `mailto:` and hands off to
+  the visitor's mail client. This site is public and unauthenticated; an
+  enquiry endpoint would be a new unauthenticated write path into the API, and
+  there is no mail infrastructure in the app to deliver it anyway (see §7).
+  Swap it for a real `POST` the day such an endpoint exists.
+
+### 18f. What still needs the client's own detail
+
+Everything marked `SAMPLE` in `src/content/siteContent.js`: legal name,
+founded year, office address, phone, both email addresses, business hours, and
+the three paragraphs of `about.story`. The pages render correctly as they
+stand — the placeholders are plausible, not lorem ipsum — but they are
+placeholders and should be replaced before the site is shown as final.
+
+### 18g. Verified
+
+- `CI=false react-scripts build` → **Compiled successfully**, no warnings.
+- Rendered in the browser at 1440px, 1280px and 390px: hero, all four pages,
+  the mobile hamburger drawer, and the footer.
+- `/` while signed out → redirects to `/home` (confirmed via `location.pathname`).
+- `/employees` while signed out → still redirects to `/login`, unchanged.
+- The login card renders as before, with the new back-link beneath it.
+
+---
+
+## 19. Product rename (Accusharp → Muster) and a rebuilt sign-in screen (2026-09-06)
+
+### 19a. The name
+
+"Accusharp" was a **client's** name used as a working title through
+development. Everything user-visible is now **Muster**; the product is
+**Muster HRMS**.
+
+A *muster roll* is the statutory attendance register every Indian factory
+already keeps — Form 12 under the Factories Act, and separately required under
+the Contract Labour Act. It is the exact word this product's buyers already use
+for the exact artifact it produces. Short, a real English word, no spelling to
+explain, and meaningful to an HR or payroll team without a sentence of
+introduction.
+
+**Before registering it, check `muster.in` / a `.com` variant and run a
+trademark search in class 9/42.** "Muster" is a common word and there is at
+least one unrelated US SaaS using it.
+
+Runner-up names, if this one is unavailable — each is a one-line change in
+`src/constants/brand.js`:
+
+| Name | Why |
+|---|---|
+| **Kaarya** (कार्य, "work") | Distinctly Indian, trivially trademarkable, no collision risk |
+| **Vetan** (वेतन, "wages") | Instantly meaningful to a payroll team; narrower than Muster |
+| **Shiftwise** | Plain English, descriptive, safest and least distinctive |
+
+### 19b. One file owns the name
+
+New: **`src/constants/brand.js`** — `name`, `productName`, `legalName`,
+`initial`, `tagline`. Everything user-visible reads from it: the public site
+(via `siteContent.js`, which spreads `BRAND` into `company`), `SiteLayout`'s
+header/footer lockup and tab titles, `AppLayout`'s sidebar wordmark, and the
+sign-in screen. Renaming the product again is now five strings in one file.
+
+Deliberately **not** renamed, and why:
+
+- the `accusharp` npm package name and the repo/folder names — not user-visible,
+  and renaming churns tooling, IDE run configs and the Dockerfile for nothing;
+- **`accusharp.lastActivity`** in `IdleSessionGuard.jsx` — a cross-tab
+  `localStorage` contract (see §"Idle session timeout" in REDESIGN_HANDOFF.md).
+  Renaming it mid-deploy would leave two tabs on different keys;
+- API paths, which carry no brand at all.
+
+`public/index.html` (title + description) and `public/manifest.json` were
+updated directly, being static files. The manifest was still carrying CRA's
+stock `"React App"` / `"Create React App Sample"` and a black theme colour —
+fixed at the same time.
+
+### 19c. The sign-in screen was one small card on an empty page
+
+Rebuilt `src/pages/Auth/Login.jsx` as a two-panel screen:
+
+- **Left, `md` and up:** navy (`sidebar.background`) brand panel with a teal
+  radial wash, the lockup, a headline, three value lines, and the copyright.
+  Hidden below `md`, where a compact lockup above the card carries the branding
+  instead.
+- **Right:** the form, now with a page-level `Sign in` heading, a sub-line
+  telling a new joiner where their User ID comes from, a **show/hide password
+  toggle**, `autoComplete="username"` / `"current-password"` so password
+  managers work, and an honest note that password reset is HR-mediated rather
+  than a "Forgot password?" link that goes nowhere (there is no self-service
+  reset — see the PRD's non-goals).
+- **Back to Muster** link under the card, into the public site.
+
+**The authentication behaviour is byte-for-byte what it was.** Same
+`login(username, password)` call, same `submitting` handling, same
+`initializing` spinner branch, same declarative `<Navigate>` (the comment
+explaining why there is no imperative `navigate()` here is preserved verbatim —
+that race caused a real intermittent blank landing page). The only new state is
+`showPassword`, which toggles the input's `type` and nothing else.
+
+### 19d. Verified
+
+- `CI=false react-scripts build` → **Compiled successfully**, no warnings.
+- Sign-in screen rendered at 1440px (split panel) and 390px (stacked lockup).
+- Public site re-checked after the rename: `document.body.innerText` on `/home`
+  contains no occurrence of the old name, and `/about`'s story paragraphs
+  interpolate correctly ("Muster started with…", "Muster HRMS treats…").
+- Per-page tab titles confirmed live: `About us · Muster HRMS`.
+- `grep -rni accusharp src public` now returns only the three intentional
+  exceptions listed in §19b.
+
+---
+
+## 20. Palette change (teal → single-accent blue) and a light sidebar (2026-09-06)
+
+### 20a. Why the teal had to go
+
+The brief was "professional, Apple-like, and mindful of colour in India". Those
+two constraints point at the same answer.
+
+**In India, the two obvious "warm brand" choices are loaded.** Saffron reads as
+religiously and politically coded — it is the colour of renunciation and of
+sadhus' robes, and of a national party. Saturated green carries a strong
+association with Islam (paradise, divine mercy), and green next to saffron
+reads as the flag. The previous accent, `#0F9D8B`, sat in the green family and
+was the single most-used colour in the product.
+
+**Blue is the one hue without that loading.** Ambedkar chose it for the
+Scheduled Castes Federation flag in 1942 specifically because it carried no
+overt association, and it is the default of Indian enterprise (HDFC, TCS,
+Infosys, SBI). Green and red survive in the palette **only as status colours**,
+which is a universal interface convention rather than a brand statement.
+
+**Apple's actual formula is achromatic restraint plus one accent.** Near-black
+ink `#1D1D1F` on parchment `#F5F5F7`, white surfaces, hairline borders, and a
+single interactive blue used for every actionable thing. No second brand hue,
+no decorative gradients, and effectively no shadows on chrome — hairlines and
+surface contrast do the separating. That is a good fit for a payroll product
+independently of taste: if blue is the only non-status colour on screen, then
+anything coloured is either actionable or a status, and a dense table reads
+faster.
+
+### 20b. The palette
+
+Every value was checked against the surface it is actually used on:
+
+| Token | Value | Contrast |
+|---|---|---|
+| `accent.main` | `#0A57C2` | 6.7:1 white-on-blue, 6.1:1 blue-on-canvas |
+| `accent.dark` | `#08459B` | hover/pressed |
+| `accent.light` | `#5B9BE5` | 5.8:1 on ink — dark surfaces only |
+| `accent.soft` | `#EAF1FB` | tinted fills, selected nav |
+| `text.primary` | `#1D1D1F` | 15.5:1 on canvas |
+| `text.secondary` | `#6E6E73` | 5.1:1 on white |
+| `neutral.bg` / `surface` / `border` | `#F5F5F7` / `#FFFFFF` / `#E5E5E7` | — |
+| `success` / `error` | `#217A46` / `#C0342B` | 5.3:1 / 5.6:1 |
+| `warning` | `#965900` | 5.6:1 |
+
+**A real accessibility bug was fixed in passing.** `warning.main` was `#B76E00`
+with a comment claiming it had been darkened to clear AA. It measures **4.0:1
+on white and 3.7:1 on the canvas** — under AA for normal text. It is now
+`#965900` (5.6:1). Everything else in the old palette was fine; this one was
+not, and the comment made it look verified.
+
+Two new tokens:
+
+- **`ink`** (`#1D1D1F`) — the deliberately dark surfaces: the marketing
+  footer and closing band, and the sign-in brand panel. Previously these
+  borrowed `sidebar.background`, which is why they had to be split out before
+  the sidebar could change colour independently.
+- **`sidebar.backgroundHover` / `sidebar.border`** — needed once the column
+  went light.
+
+Marketing CTAs are now pill-shaped (`borderRadius: 999`), which is apple.com's
+signature; **application** buttons stay rounded rectangles, because pills on a
+dense toolbar read as toy-like. Apple splits the same way.
+
+### 20c. The sidebar: light first, then corrected to ink
+
+**First attempt (wrong for this product).** The sidebar was made light — white
+column, hairline edge, soft blue pill for the active item — on the reasoning
+that every Apple pro app (Finder, Mail, Notes, Xcode) draws one that way, and
+that ~26 nav entries in a navy column is a lot of ink next to the data.
+
+That is correct by the rulebook and wrong here, and the user said so
+immediately: *"there is no combination — somewhere I am seeing dark blue and
+the sidebar is directly white."* They were right. This product has dark
+surfaces on **both sides of the sign-in boundary** — the sign-in brand panel
+and the marketing footer/closing band — so a white column between them read as
+two unrelated products stitched together. Apple's pro apps get away with a
+light sidebar because nothing else in those apps is dark.
+
+**What it is now.** The sidebar is the same `ink` surface as everything else
+that is deliberately dark. There is exactly **one** dark colour in the product,
+`#1C1D21`, and the app shell, the sign-in panel and the site footer all use it.
+Sign in and the dark panel you were looking at simply becomes the dark column
+you keep working in.
+
+| Sidebar token | Value | Contrast |
+|---|---|---|
+| `background` | `#1C1D21` | 15.5:1 vs the canvas |
+| `backgroundActive` | `#0B62DE` | 5.5:1 for its white label, 3.1:1 vs the column |
+| `backgroundHover` | `rgba(255,255,255,0.07)` | — |
+| `text` | `#A1A1A6` | 6.6:1 |
+| `sectionLabel` | `#8A8A8F` | 4.9:1 |
+| `border` | `rgba(255,255,255,0.08)` | brand divider + right edge |
+
+The active item is a **solid accent pill**, lifted from the base accent
+(`#0A57C2` → `#0B62DE`) so it carries on near-black while keeping its white
+label above AA. That pill is the only place the brand blue appears in the
+chrome, and it is what ties the dark shell to the blue primary buttons in the
+content area — the "combination" that was missing.
+
+`AppLayout.jsx` edits, all styling: the drawer paper carries a right hairline,
+the brand lockup is separated from the nav list by that same hairline, the
+wordmark reads `sidebar.textActive`, and the selected/hover states use
+`sidebar.textActive` / `sidebar.backgroundHover` instead of the hardcoded
+`#fff` and `rgba(255,255,255,0.06)` they used before.
+
+**The lesson worth keeping:** copying a reference design's rule (light sidebar)
+without checking the rest of the surface inventory produced something
+defensible on paper and disjointed on screen. The fix was not "go back to
+navy" — it was to make every dark surface in the product literally the same
+colour.
+
+### 20d. Nav icons: four identical umbrellas
+
+`My Workspace` had **four consecutive items** (`Apply Leave`, `My Leaves`,
+`Leave Calendar`, `Leave Balances`) all rendering the same
+`BeachAccessRoundedIcon`, plus two more elsewhere. An icon column where four
+adjacent rows share a glyph is decoration, not navigation. Now:
+`EditCalendar` / `BeachAccess` / `DateRange` / `DonutSmall`, plus
+`PendingActions` for approvals and `FactCheck` for All Leaves. Labels, paths,
+roles and order are untouched.
+
+### 20e. The structural sidebar problem — analysed, NOT changed
+
+Worth knowing before anyone touches nav again. **The sidebar duplicates
+navigation that already exists inside the pages.** The app has six tabbed
+layouts (`LeaveLayout`, `AttendanceConsoleLayout`, `PayrollLayout`,
+`MastersLayout`, `RosterLayout`, `ContractorsLayout`), and the sidebar *also*
+lists the individual tabs as separate top-level entries:
+
+| Section | Sidebar entries today | Entries if the tab owner is listed once |
+|---|---|---|
+| Leave (self-service) | 4 | 1 |
+| Contractors | 5 | 1 |
+| Leave (HR) + approvals | 2 | 2 |
+| **ADMIN total visible** | **~26** | **~14** |
+
+Published guidance puts the practical ceiling at 5–8 items per group before a
+sidebar starts to feel overwhelming; several groups here are well past it.
+Collapsing each tabbed module to a single entry would halve the list and lose
+nothing — every removed destination stays reachable as the tab it already is.
+
+**Not done in this pass, deliberately.** Changing which destinations are
+directly reachable is a navigation change, not a styling one, and it was asked
+about rather than asked for. It is a `navConfig.js`-only edit when someone
+wants it — no route in `App.js` would change, and `RequireRole` reads only the
+exported role constants, not the item list.
+
+### 20f. Verified
+
+- `CI=false react-scripts build` → **Compiled successfully**, no warnings.
+- Contrast ratios computed, not eyeballed — see the table in §20b.
+- Both sidebar versions were rendered and screenshotted — including the
+  selected state, and the second time against a mock top bar, card and primary
+  button so the whole composition could be judged — via a **temporary** public
+  preview route (`SidebarContent` exported, a throwaway page, one route). All
+  of it was removed afterwards both times; `grep -rn "SidebarPreview" src`
+  returns nothing. Signing in to look at the real thing was not an option —
+  that needs credentials.
+- Public site, sign-in screen (1440px split panel and 390px stacked), the
+  ink footer and closing band all re-checked after the palette change.

@@ -6,6 +6,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RequireRole from './components/RequireRole';
 import { HR_ADMIN, SUP_HR_ADMIN, ADMIN_ONLY, PLATFORM_ONLY } from './layout/navConfig';
 import { useAuth } from './context/AuthContext';
+import SiteLayout from './layout/SiteLayout';
+import SiteHome from './pages/Site/Home';
+import SiteServices from './pages/Site/Services';
+import SiteAbout from './pages/Site/About';
+import SiteContact from './pages/Site/Contact';
 import Login from './pages/Auth/Login';
 import ChangePassword from './pages/Auth/ChangePassword';
 import Dashboard from './pages/Dashboard/Dashboard';
@@ -25,6 +30,12 @@ import MyTeam from './pages/Employees/MyTeam';
 import BulkImportEmployees from './pages/Employees/BulkImportEmployees';
 import BulkSalaryRevision from './pages/Employees/BulkSalaryRevision';
 import BulkSalaryStructure from './pages/Employees/BulkSalaryStructure';
+import ContractorsLayout from './pages/Contractors/ContractorsLayout';
+import ContractorList from './pages/Contractors/ContractorList';
+import ContractorWorkforce from './pages/Contractors/ContractorWorkforce';
+import ContractorRoster from './pages/Contractors/ContractorRoster';
+import ContractorAttendance from './pages/Contractors/ContractorAttendance';
+import ContractorReports from './pages/Contractors/ContractorReports';
 import ShiftList from './pages/Shifts/ShiftList';
 import RosterLayout from './pages/Roster/RosterLayout';
 import Planner from './pages/Roster/Planner';
@@ -112,6 +123,17 @@ function RootRedirect() {
 function App() {
   return (
     <Routes>
+      {/* Public marketing site. No auth, no API calls, no shared state with
+          the application - it only renders copy from src/content/siteContent.js.
+          It sits in front of the sign-in form so a visitor (or a demo) lands on
+          the company site first and signs in from there. */}
+      <Route element={<SiteLayout />}>
+        <Route path="/home" element={<SiteHome />} />
+        <Route path="/services" element={<SiteServices />} />
+        <Route path="/about" element={<SiteAbout />} />
+        <Route path="/contact" element={<SiteContact />} />
+      </Route>
+
       <Route path="/login" element={<Login />} />
 
       <Route element={<ProtectedRoute />}>
@@ -141,6 +163,20 @@ function App() {
 
           <Route element={<RequireRole allow={SUP_HR_ADMIN} />}>
             <Route path="/team" element={<MyTeam />} />
+
+            {/* A SUPERVISOR holds CONTRACTOR_READ and SHIFT_SCHEDULE_MANAGE, so
+                they can see the workforce they supervise and roster it. The
+                manage-only actions inside each page are gated on
+                can('CONTRACTOR_MANAGE') individually. */}
+            <Route path="/contractors" element={<ContractorsLayout />}>
+              <Route index element={<ContractorList />} />
+              <Route path="list" element={<ContractorList />} />
+              <Route path="workforce" element={<ContractorWorkforce />} />
+              <Route path="roster" element={<ContractorRoster />} />
+              <Route path="attendance" element={<ContractorAttendance />} />
+              <Route path="reports" element={<ContractorReports />} />
+            </Route>
+
             <Route path="/roster" element={<RosterLayout />}>
               <Route index element={<Planner />} />
               <Route path="planner" element={<Planner />} />

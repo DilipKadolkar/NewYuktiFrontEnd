@@ -23,17 +23,21 @@ import { useAuth } from '../context/AuthContext';
 import navConfig, { platformNavConfig } from './navConfig';
 import { ROLE_COLOR } from '../constants/enums';
 import IdleSessionGuard from '../components/IdleSessionGuard';
+import { BRAND } from '../constants/brand';
 
 const DRAWER_WIDTH = 260;
 
-// The Drawer's Paper defaults to `background.paper` (white). The sidebar navy
-// is painted on the content Box inside it, so once the nav list grew taller
-// than the viewport the Box stopped at 100% height and the scrolled remainder
-// exposed white Paper underneath — which is why it came and went with screen
-// size and role. Painting the Paper keeps the column navy at any height.
+// The Drawer's Paper is painted explicitly rather than left to default. When
+// the sidebar was navy this fixed a real bug — a nav list taller than the
+// viewport left white Paper showing below the coloured Box — and the same
+// explicit painting keeps working now that the column is light. The hairline
+// on the right is what separates the sidebar from the canvas, in place of the
+// colour contrast a dark column used to provide.
 const drawerPaperSx = {
   width: DRAWER_WIDTH,
   border: 'none',
+  borderRight: '1px solid',
+  borderColor: 'sidebar.border',
   bgcolor: 'sidebar.background',
   color: 'sidebar.text',
 };
@@ -46,12 +50,16 @@ function SidebarContent({ isPlatform, role }) {
 
   return (
     <Box sx={{ bgcolor: 'sidebar.background', minHeight: '100%', color: 'sidebar.text', pb: 2 }}>
-      <Box sx={{ px: 3, py: 3 }}>
+      <Box
+        sx={{ px: 3, py: 3, mb: 1, borderBottom: '1px solid', borderColor: 'sidebar.border' }}
+      >
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-          <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>A</Avatar>
+          <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>
+            {BRAND.initial}
+          </Avatar>
           <Box>
-            <Typography sx={{ color: '#fff', fontWeight: 800, lineHeight: 1.1 }}>
-              Accusharp
+            <Typography sx={{ color: 'sidebar.textActive', fontWeight: 800, lineHeight: 1.1 }}>
+              {BRAND.name}
             </Typography>
             <Typography variant="caption" sx={{ color: 'sidebar.sectionLabel' }}>
               HRMS
@@ -89,10 +97,10 @@ function SidebarContent({ isPlatform, role }) {
                       color: active ? 'sidebar.textActive' : 'sidebar.text',
                       '&.Mui-selected': {
                         bgcolor: 'sidebar.backgroundActive',
-                        color: '#fff',
+                        color: 'sidebar.textActive',
                         '&:hover': { bgcolor: 'sidebar.backgroundActive' },
                       },
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.06)' },
+                      '&:hover': { bgcolor: 'sidebar.backgroundHover' },
                     }}
                   >
                     <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>

@@ -1,6 +1,11 @@
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import BeachAccessRoundedIcon from '@mui/icons-material/BeachAccessRounded';
+import EditCalendarRoundedIcon from '@mui/icons-material/EditCalendarRounded';
+import DateRangeRoundedIcon from '@mui/icons-material/DateRangeRounded';
+import DonutSmallRoundedIcon from '@mui/icons-material/DonutSmallRounded';
+import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded';
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
@@ -13,6 +18,7 @@ import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import DomainAddRoundedIcon from '@mui/icons-material/DomainAddRounded';
+import EngineeringRoundedIcon from '@mui/icons-material/EngineeringRounded';
 
 // Exported so RequireRole (route-level guarding, see App.js) reads the exact
 // same role lists as the sidebar's own visibility check - one source of truth
@@ -35,10 +41,10 @@ const navConfig = [
     label: 'My Workspace',
     items: [
       { label: 'My Attendance', path: '/attendance/me', icon: EventAvailableRoundedIcon },
-      { label: 'Apply Leave', path: '/leave/apply', icon: BeachAccessRoundedIcon },
+      { label: 'Apply Leave', path: '/leave/apply', icon: EditCalendarRoundedIcon },
       { label: 'My Leaves', path: '/leave/my', icon: BeachAccessRoundedIcon },
-      { label: 'Leave Calendar', path: '/leave/calendar', icon: BeachAccessRoundedIcon },
-      { label: 'Leave Balances', path: '/leave/balances', icon: BeachAccessRoundedIcon },
+      { label: 'Leave Calendar', path: '/leave/calendar', icon: DateRangeRoundedIcon },
+      { label: 'Leave Balances', path: '/leave/balances', icon: DonutSmallRoundedIcon },
       { label: 'My Salary Slip', path: '/salary-slips/me', icon: ReceiptLongRoundedIcon },
     ],
   },
@@ -49,7 +55,7 @@ const navConfig = [
       {
         label: 'Pending Approvals',
         path: '/leave/approvals',
-        icon: BeachAccessRoundedIcon,
+        icon: PendingActionsRoundedIcon,
         visibleFor: SUP_HR_ADMIN,
       },
       {
@@ -70,7 +76,7 @@ const navConfig = [
       {
         label: 'All Leaves',
         path: '/leave/all',
-        icon: BeachAccessRoundedIcon,
+        icon: FactCheckRoundedIcon,
         visibleFor: HR_ADMIN,
       },
       {
@@ -88,6 +94,42 @@ const navConfig = [
       },
       { label: 'Masters', path: '/masters/companies', icon: ApartmentRoundedIcon, visibleFor: HR_ADMIN },
       { label: 'Reports', path: '/reports', icon: AssessmentRoundedIcon, visibleFor: HR_ADMIN },
+    ],
+  },
+  {
+    label: 'Contractors',
+    visibleFor: SUP_HR_ADMIN,
+    items: [
+      {
+        label: 'Contractors',
+        path: '/contractors/list',
+        icon: EngineeringRoundedIcon,
+        visibleFor: SUP_HR_ADMIN,
+      },
+      {
+        label: 'Contractor Workforce',
+        path: '/contractors/workforce',
+        icon: GroupsRoundedIcon,
+        visibleFor: SUP_HR_ADMIN,
+      },
+      {
+        label: 'Contractor Roster',
+        path: '/contractors/roster',
+        icon: CalendarMonthRoundedIcon,
+        visibleFor: SUP_HR_ADMIN,
+      },
+      {
+        label: 'Contractor Attendance',
+        path: '/contractors/attendance',
+        icon: EventAvailableRoundedIcon,
+        visibleFor: SUP_HR_ADMIN,
+      },
+      {
+        label: 'Contractor Reports',
+        path: '/contractors/reports',
+        icon: AssessmentRoundedIcon,
+        visibleFor: SUP_HR_ADMIN,
+      },
     ],
   },
   {
