@@ -66,7 +66,7 @@ export default function Login() {
               A
             </Avatar>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Accusharp HRMS
+              NewYukti HRMS
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Sign in to continue

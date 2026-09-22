@@ -1,4 +1,4 @@
-# Accusharp HRMS Frontend — Handoff
+# NewYukti HRMS Frontend — Handoff
 
 Built: 2026-08-05. Updated: 2026-08-09 (auth/roles/permissions catch-up),
 2026-08-16 (bulk employee onboarding: structure override, salary revision,
@@ -7,7 +7,7 @@ UAN/ESIC/bank fields, Employee Master report full CSV export — see §14),
 2026-08-22 (bulk-import CSV header detection, DAY_WISE overtime/earn-wage/
 ESIC formula fixes, human-readable hours + totals in the attendance UI — see
 §15).
-GreyHR-style React frontend for the Accusharp HRMS Spring Boot backend. This doc
+GreyHR-style React frontend for the NewYukti HRMS Spring Boot backend. This doc
 is for whoever picks this up next — what's here, how it's wired, what's
 deliberately missing, and what to do first.
 
@@ -19,13 +19,13 @@ Two servers, no build step needed for dev:
 
 ```bash
 # Backend — H2 in-memory, no MySQL needed, seeds demo data + permissions on boot
-cd Accusharp
+cd NewYukti
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=h2
 ```
 
 ```bash
 # Frontend
-cd Accusharpfrontend/accusharp
+cd NewYuktifrontend/newyukti
 npm install   # first time only
 npm start     # http://localhost:3000
 ```
@@ -45,13 +45,13 @@ previously listed `HR001`/`SUP001`/`EMP001`/`EMP002` as seeded logins. They do
 **not** exist on a fresh boot of the backend as currently checked out —
 `DataSeeder.seedOrganisation()` has its entire demo-company/employee block
 commented out (only the four shifts and `platform_owner` actually seed; see
-`Accusharp/src/main/java/com/accusharp/hrms/config/DataSeeder.java`). Logging
-in as `HR001`/`Accusharp@123` returns "Invalid username or password," not a
+`NewYukti/src/main/java/com/newyukti/hrms/config/DataSeeder.java`). Logging
+in as `HR001`/`NewYukti@123` returns "Invalid username or password," not a
 working session. If that block gets re-enabled later this table becomes true
 again, but don't take it on faith — check `DataSeeder.java` first.
 
 The one login that reliably works out of the box is the platform account
-(password **`Accusharp@123`**, see `Accusharp/SECURITY.md`):
+(password **`NewYukti@123`**, see `NewYukti/SECURITY.md`):
 
 | User ID | Role | Notes |
 |---|---|---|
@@ -88,7 +88,7 @@ this date.
 
 **Real authentication, real authorization.** The backend enforces JWT auth and a
 data-driven permission matrix (`PermissionCode` + `PermissionSeeder`) on every
-`/api/**` route — see `Accusharp/SECURITY.md`. The frontend now matches: a login
+`/api/**` route — see `NewYukti/SECURITY.md`. The frontend now matches: a login
 screen issues and stores a JWT access/refresh token pair, every request carries
 `Authorization: Bearer <token>`, and nav/page actions are gated by a
 frontend-side mirror of the same role→permission matrix
@@ -103,7 +103,7 @@ therefore driven by the static base-role matrix, same as the backend's own fast
 path. An employee who gained an extra capability purely through a custom role
 won't get an extra nav item for it automatically, but the underlying API call
 still works if they reach it by URL. This mirrors a documented limitation in the
-backend itself (`Accusharp/ARCHITECTURE.md`'s "Not implemented" list), not
+backend itself (`NewYukti/ARCHITECTURE.md`'s "Not implemented" list), not
 something introduced here.
 
 ---
@@ -178,7 +178,7 @@ Worth revisiting if the app grows.
 The backend landed ten phases of security work on `feature/attendance-to-
 Security-` (JWT auth, permissions, multi-tenant isolation, audit logging,
 admin password reset, dynamic custom roles — full detail in
-`Accusharp/SECURITY.md`) while this frontend still assumed the old
+`NewYukti/SECURITY.md`) while this frontend still assumed the old
 unauthenticated backend (see the git history of this file / §2 in earlier
 revisions). This section is what closed that gap.
 
@@ -199,7 +199,7 @@ rather than duplicating the page.
 
 The backend's `CustomRoleController` (create a named role, grant it permissions,
 assign it to employees) previously had no frontend at all — flagged as a gap in
-`Accusharp/ARCHITECTURE.md`. Now: `/roles` (list + create, ADMIN-only) and
+`NewYukti/ARCHITECTURE.md`. Now: `/roles` (list + create, ADMIN-only) and
 `/roles/:id` (a permission checklist grouped by resource — Employee, Leave,
 Payroll, etc. — with platform-only codes like `COMPANY_CREATE` and
 `AUDIT_MANAGE` omitted entirely, mirroring `CustomRoleService.setPermissions`'s
@@ -244,7 +244,7 @@ onboarding.
 
 ### 4f. Token handling
 
-`localStorage` under one `accusharp.auth` key holds the whole `TokenResponse`.
+`localStorage` under one `newyukti.auth` key holds the whole `TokenResponse`.
 `api/client.js`'s request interceptor attaches the access token to every call;
 its response interceptor does a silent refresh-and-retry exactly once on a 401
 (a shared in-flight promise so concurrent 401s don't each trigger their own
@@ -367,7 +367,7 @@ normal use, but a token wasn't deliberately expired to watch the refresh fire).
    `React.lazy()` would help, especially for the Reports module (13 rarely-all-
    used pages bundled together).
 4. **No tests.** Zero unit/integration tests were written for the frontend. The
-   backend has its own (`Accusharp/TESTING.md`, `./mvnw test`), but the React app
+   backend has its own (`NewYukti/TESTING.md`, `./mvnw test`), but the React app
    has none — this now includes zero coverage of the auth flow, which is the
    highest-value thing to add tests for next.
 5. **Duplicate fetching** — see §3. Consider a shared data layer if this grows.
@@ -386,7 +386,7 @@ normal use, but a token wasn't deliberately expired to watch the refresh fire).
    `BulkImportEmployees.jsx`'s "Download passwords CSV" button already builds
    the credentials CSV client-side from the JSON response (`utils/csv.js`).
    The backend separately added `?format=csv` on
-   `POST /api/employees/bulk-import` (`Accusharp/SECURITY.md`'s Phase 11)
+   `POST /api/employees/bulk-import` (`NewYukti/SECURITY.md`'s Phase 11)
    that does the same thing server-side. Neither was removed — the frontend
    one works fine and wasn't broken, so wiring in the backend one would have
    been redundant, not a fix. Worth knowing if either one changes: they can
@@ -411,9 +411,9 @@ before Jackson tried to serialize the lazy `company` proxy on the list endpoint.
 
 Fixed in the backend (not the frontend) by adding a `JOIN FETCH` query:
 
-- [`Accusharp/src/main/java/com/accusharp/hrms/repository/HolidayRepository.java`](../../Accusharp/src/main/java/com/accusharp/hrms/repository/HolidayRepository.java) —
+- [`NewYukti/src/main/java/com/newyukti/hrms/repository/HolidayRepository.java`](../../NewYukti/src/main/java/com/newyukti/hrms/repository/HolidayRepository.java) —
   added `findAllWithCompany()` and made the date-range finder also fetch `company`.
-- [`Accusharp/src/main/java/com/accusharp/hrms/service/HolidayService.java`](../../Accusharp/src/main/java/com/accusharp/hrms/service/HolidayService.java) —
+- [`NewYukti/src/main/java/com/newyukti/hrms/service/HolidayService.java`](../../NewYukti/src/main/java/com/newyukti/hrms/service/HolidayService.java) —
   `getAll()` now calls `findAllWithCompany()`.
 
 Single-record POST/PUT responses were never affected (the service sets a fully
@@ -452,7 +452,7 @@ backend, not by reading the code:
 4. Revisit data fetching — a shared cache (React Query or similar) would cut
    the duplicate `/api/employees` calls visible on nearly every navigation.
 5. Consider a forced-password-change flag for temporary passwords (backend
-   doesn't set one yet — see `Accusharp/SECURITY.md`'s onboarding section) so
+   doesn't set one yet — see `NewYukti/SECURITY.md`'s onboarding section) so
    the frontend can route a first-login temp-password user straight to
    `/change-password` instead of trusting them to do it themselves. Revisited
    and explicitly declined for now during §10's backend work — still open.
@@ -462,7 +462,7 @@ backend, not by reading the code:
 ## 10. Bulk employee onboarding: structure override, salary revision, credentials export (2026-08-16)
 
 The backend added three related things on top of Phase 9-11's work
-(`Accusharp/SECURITY.md`): a way to supply an employee's exact salary
+(`NewYukti/SECURITY.md`): a way to supply an employee's exact salary
 structure at create time instead of always deriving it, an audited way to
 change gross salary (a "salary revision"), and a downloadable credentials
 sheet for bulk imports. This section wires the frontend to all three.
@@ -530,7 +530,7 @@ of the same button. See §7.7 for the maintenance note this leaves behind.
 
 ### 10d. A real gap found while verifying, not introduced by this work
 
-Logging in as `HR001`/`Accusharp@123` to test any of the above failed
+Logging in as `HR001`/`NewYukti@123` to test any of the above failed
 outright — see the corrected §1. The seeded demo org
 (`DataSeeder.seedOrganisation()`) is currently commented out in the backend,
 so there is no seeded company, department, designation, or non-platform
@@ -554,14 +554,14 @@ number formatting.
 ### 11a. Backend: numeric columns now tolerate Excel-style formatting
 
 `EmployeeCsvParser.parseDecimal`/`parseLong` and `PayrollCsvParser.parseDecimal`
-(`Accusharp/src/main/java/com/accusharp/hrms/util/`) strip commas, `₹`/`$`
+(`NewYukti/src/main/java/com/newyukti/hrms/util/`) strip commas, `₹`/`$`
 symbols, and stray whitespace before parsing — `"41,000.00"`, `"₹ 41,000.00"`,
 and `"$15,000.00"` all now parse the same as `"41000.00"`. Genuinely
 non-numeric text (`"notanumber"`) still fails with the same error as before;
 only formatting decoration is tolerated. Covered by two new cases in
 `EmployeeCsvParserTest` (`parsesThousandsSeparatedNumbers`,
-`parsesCurrencyDecoratedNumbers`). See `Accusharp/README.md` §3.4.2 and
-`Accusharp/TESTING.md`'s "Bulk & CSV endpoints" for the corresponding doc
+`parsesCurrencyDecoratedNumbers`). See `NewYukti/README.md` §3.4.2 and
+`NewYukti/TESTING.md`'s "Bulk & CSV endpoints" for the corresponding doc
 updates.
 
 ### 11b. Frontend: the CSV template became a styled xlsx template
@@ -614,7 +614,7 @@ same shape for payroll. This section gives attendance the same treatment.
 
 ### 12a. Backend: new `AttendanceRule`, mirroring `SalaryRule` exactly
 
-New entity/repository/service/controller in `Accusharp/src/main/java/com/accusharp/hrms/`
+New entity/repository/service/controller in `NewYukti/src/main/java/com/newyukti/hrms/`
 (`entity/AttendanceRule.java`, `repository/AttendanceRuleRepository.java`,
 `service/AttendanceRuleService.java`, `controller/AttendanceRuleController.java`,
 `dto/AttendanceRuleRequest.java`) - one row per company plus a
@@ -692,7 +692,7 @@ the full apply → supervisor-endorse → HR-approve chain the self-service
 
 ### 13a. Backend: a second entry point into `APPROVED`, not a second workflow
 
-New `POST /api/leaves/hr-create` (`Accusharp/src/main/java/com/accusharp/hrms/`,
+New `POST /api/leaves/hr-create` (`NewYukti/src/main/java/com/newyukti/hrms/`,
 `LeaveService.hrDirectCreate` + `dto/LeaveHrDirectRequest.java`) skips
 `apply`/`supervisorApprove` entirely: same date/overlap/balance validations
 `apply` runs - **hard-blocks on insufficient balance**, the option chosen
@@ -770,7 +770,7 @@ emp." Category was explicitly asked to work "like department and designation"
 ### 14a. Backend: a fourth master mirroring `Department`/`Designation` exactly
 
 New `Category` entity/repository/service/controller/DTO
-(`Accusharp/src/main/java/com/accusharp/hrms/{entity,repository,service,
+(`NewYukti/src/main/java/com/newyukti/hrms/{entity,repository,service,
 controller,dto}/Category*.java`) at `/api/categories` - same per-company +
 `company IS NULL` shared-row shape, same code-uniqueness/read/write-scoping
 rules as `Department`. New permissions `CATEGORY_MANAGE`/`CATEGORY_READ`,
@@ -878,15 +878,15 @@ Import Template,,,,,...` - `CsvRowParser` (shared by all four bulk-import
 CSV parsers) always trusted row 1 as the header and choked on it with
 `Malformed CSV header: ...`.
 
-`CsvRowParser.parse` (`Accusharp/src/main/java/com/accusharp/hrms/util/`)
+`CsvRowParser.parse` (`NewYukti/src/main/java/com/newyukti/hrms/util/`)
 now takes a `headerHintColumn` - one of the caller's own required columns
 (`employeeCode`, `employeeId`, `shiftCode`, `leaveType` for the four
 parsers respectively) - scans for the first row containing it, and treats
 everything above as decoration to skip. The same pass strips the trailing
 `" *"` marker so required-column headers match by name. `EmployeeCsvParser`/
 `PayrollCsvParser`/`ShiftAssignmentCsvParser`/`LeaveCsvParser` each just pass
-their hint at the one call site. See `Accusharp/ARCHITECTURE.md`'s "Bulk /
-CSV mutation endpoints" section and `Accusharp/README.md` §3.4.2 for the
+their hint at the one call site. See `NewYukti/ARCHITECTURE.md`'s "Bulk /
+CSV mutation endpoints" section and `NewYukti/README.md` §3.4.2 for the
 corresponding doc updates.
 
 ### 15b. Backend: DAY_WISE overtime is now measured against present days, with paid leave added on top
@@ -914,7 +914,7 @@ first one looked plausible but had a real gap:
    are added as a fully separate term afterward, so they're never at risk of
    being absorbed by the cap.
 
-`Accusharp/src/test/java/com/accusharp/hrms/DayWisePayrollOvertimeTest.java`
+`NewYukti/src/test/java/com/newyukti/hrms/DayWisePayrollOvertimeTest.java`
 covers both the present-days-alone cap and the leave-added-on-top behavior
 with worked examples.
 
@@ -939,7 +939,7 @@ paid against.
 earnOther`) for both the 21,000 wage-ceiling test and the deduction
 percentage. Changed to take `payroll.getEarnBasicDA()` alone for both -
 applies to every employment status, not just DAY_WISE, since it's one shared
-function. `Accusharp/TESTING.md` and `Accusharp/WALKTHROUGH.md`'s worked
+function. `NewYukti/TESTING.md` and `NewYukti/WALKTHROUGH.md`'s worked
 payroll example (Priya Kulkarni, `EMP005`) had its `esic`/`totalDeduction`/
 `netSalary` figures (and everything that echoes them further down each doc -
 the salary slip, the CSV export, the regenerate/revision-history example)

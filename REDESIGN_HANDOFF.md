@@ -1,7 +1,7 @@
-# AccuSharp Frontend Redesign — Session Handoff
+# NewYukti Frontend Redesign — Session Handoff
 
 Status snapshot of the Apple-inspired frontend redesign, driven by
-`AccuSharp HRMS — Principal Full-Stack Engineer & Production Frontend
+`NewYukti HRMS — Principal Full-Stack Engineer & Production Frontend
 Redesign Prompt.md` at the workspace root. Read that file first for the
 full spec; this doc is a running log of what's actually been done against
 it, so a new session (or a human) can pick up without re-deriving context.
@@ -43,7 +43,7 @@ lowered the constants to a few seconds, drove the whole flow via the
 browser tab, and confirmed via direct `localStorage`/DOM checks — not
 screenshots alone, since the timing is easy to eyeball wrong — that (1) the
 warning dialog appears while the session is still authenticated, (2) taking
-no action results in a real logout with `accusharp.auth` cleared and a
+no action results in a real logout with `newyukti.auth` cleared and a
 redirect to `/login`, and (3) clicking "Stay signed in" genuinely resets
 the timer — the session was still alive well past when it would otherwise
 have expired. Reverted the constants to the real 15-minute/60-second values
@@ -58,10 +58,10 @@ a fresh grep pass rather than relying on memory):
    but a one-line fix with no downside). Fixed.
 2. **A real bug in the idle-timeout feature above, introduced by that same
    feature**: `localStorage` is shared across every tab of the same origin.
-   If one idle tab logged out, it silently cleared `accusharp.auth` (and
+   If one idle tab logged out, it silently cleared `newyukti.auth` (and
    revoked the refresh token server-side) for *every* open tab, including
    one the user was actively working in. Fixed by broadcasting activity
-   through a second `localStorage` key (`accusharp.lastActivity`) that
+   through a second `localStorage` key (`newyukti.lastActivity`) that
    every tab's guard listens for via the `storage` event — real activity in
    any tab now resets every tab's timer. **Verified with two real browser
    tabs**, not by inspection: tab 1 idled into its warning dialog, tab 2
@@ -130,12 +130,12 @@ variant was correctly rejected by the backend, independent of the frontend.
 — a real, committed placeholder. I forged a `PLATFORM_OWNER` token from
 nothing (no login, no password) by signing it with that exact placeholder
 string, and the then-running local backend accepted it and returned the
-real company list (`Accusharp`, `Accenture`, plus the test companies). That's
+real company list (`NewYukti`, `Accenture`, plus the test companies). That's
 a full authentication bypass for any deployment that forgets to set
 `JWT_SECRET` — and the placeholder being public source means "forgets" is
 the only bar.
 
-**Fixed** (`Accusharp/src/main/java/com/accusharp/hrms/security/JwtService.java`,
+**Fixed** (`NewYukti/src/main/java/com/newyukti/hrms/security/JwtService.java`,
 backend, done with explicit approval — this is outside the frontend redesign
 scope but too severe to leave for later): the constructor now throws
 `IllegalStateException` and refuses to start if `jwt.secret` still equals
@@ -331,7 +331,7 @@ and safe to delete whenever:**
 
 | Account | Username | Password | Role |
 |---|---|---|---|
-| Platform (pre-existing, from `DataSeeder`) | `platform_owner` | `Accusharp@123` | PLATFORM_OWNER |
+| Platform (pre-existing, from `DataSeeder`) | `platform_owner` | `NewYukti@123` | PLATFORM_OWNER |
 | Test company admin | `QATEST_ADMIN` | `Tp7-6DwXsvzr5HJgbvg9S3Rplcbb` | ADMIN |
 | Test employee | `QATEST_EMP1` | `Tp7-lSoKmc5oL0rsiZ2bGYaFINnM` | EMPLOYEE |
 | Test supervisor | `QATEST_SUP1` | `Tp7-hfOljHwoq2tiSjG9nWjjc5QH` | SUPERVISOR |
@@ -343,7 +343,7 @@ attendance, one payroll revision, bank/UAN/ESIC test values on `QATEST_EMP1`.
 To delete it later: log in as `platform_owner` → Companies → delete the
 `QATEST` row (or ask me to do it).
 
-**Dev server:** `npm start` in `Accusharpfrontend/accusharp`, runs on
+**Dev server:** `npm start` in `NewYuktifrontend/newyukti`, runs on
 `:3000`. Backend was already running on `:8080` from a separate IntelliJ
 session — start your own if it's not still up.
 

@@ -17,7 +17,7 @@ const tableHeight = (count) => Math.min(420, Math.max(160, 90 + count * 52));
 
 /**
  * Renders the uniform `{totalRows, successCount, failureCount, succeeded, errors}`
- * shape every backend bulk/CSV endpoint returns (Accusharp/ARCHITECTURE.md's
+ * shape every backend bulk/CSV endpoint returns (NewYukti/ARCHITECTURE.md's
  * "Bulk / CSV mutation endpoints") - every row is attempted independently, so a
  * result is normally a mix of both tables, not all-or-nothing.
  */

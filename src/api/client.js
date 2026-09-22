@@ -12,7 +12,7 @@ const client = axios.create({
 // ---------------------------------------------------------------------------
 // Access token - held in memory, deliberately never in localStorage.
 //
-// Both tokens used to live in localStorage under 'accusharp.auth', which meant
+// Both tokens used to live in localStorage under 'newyukti.auth', which meant
 // a single XSS anywhere in this bundle handed an attacker a seven-day session
 // (the refresh token) on an app holding salary and bank data. The refresh token
 // is now an httpOnly cookie that JavaScript cannot read at all, and the access

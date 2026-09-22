@@ -25,7 +25,7 @@ const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scr
 // reset whenever any tab sees real activity, the same way a proper single
 // sign-out would. Only a timestamp goes through this key; no credential has
 // been in web storage since the move to cookie-based sessions.
-const ACTIVITY_BROADCAST_KEY = 'accusharp.lastActivity';
+const ACTIVITY_BROADCAST_KEY = 'newyukti.lastActivity';
 
 export default function IdleSessionGuard() {
   const { logout } = useAuth();

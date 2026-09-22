@@ -39,7 +39,7 @@ function SidebarContent({ isPlatform, role }) {
           <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>A</Avatar>
           <Box>
             <Typography sx={{ color: '#fff', fontWeight: 800, lineHeight: 1.1 }}>
-              Accusharp
+              NewYukti
             </Typography>
             <Typography variant="caption" sx={{ color: 'sidebar.sectionLabel' }}>
               HRMS
