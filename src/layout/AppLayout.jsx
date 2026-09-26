@@ -26,20 +26,21 @@ import IdleSessionGuard from '../components/IdleSessionGuard';
 
 const DRAWER_WIDTH = 260;
 
-function SidebarContent({ isPlatform, role }) {
+function SidebarContent({ isPlatform, role, companyName }) {
   const location = useLocation();
   const config = isPlatform ? platformNavConfig : navConfig;
 
   const visible = (item) => !item.visibleFor || item.visibleFor.includes(role);
+  const brandName = (!isPlatform && companyName) ? companyName : 'NewYukti';
 
   return (
     <Box sx={{ bgcolor: 'sidebar.background', height: '100%', color: 'sidebar.text' }}>
       <Box sx={{ px: 3, py: 3 }}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-          <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>A</Avatar>
+          <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 700, width: 36, height: 36 }}>{brandName.charAt(0).toUpperCase()}</Avatar>
           <Box>
             <Typography sx={{ color: '#fff', fontWeight: 800, lineHeight: 1.1 }}>
-              NewYukti
+              {brandName}
             </Typography>
             <Typography variant="caption" sx={{ color: 'sidebar.sectionLabel' }}>
               HRMS
@@ -163,7 +164,8 @@ function UserMenu() {
 
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { role, isPlatform } = useAuth();
+  const { role, isPlatform, me } = useAuth();
+  const companyName = me?.companyName;
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -205,7 +207,7 @@ export default function AppLayout() {
             '& .MuiDrawer-paper': { width: DRAWER_WIDTH, border: 'none' },
           }}
         >
-          <SidebarContent isPlatform={isPlatform} role={role} />
+          <SidebarContent isPlatform={isPlatform} role={role} companyName={companyName} />
         </Drawer>
         <Drawer
           variant="permanent"
@@ -215,7 +217,7 @@ export default function AppLayout() {
           }}
           open
         >
-          <SidebarContent isPlatform={isPlatform} role={role} />
+          <SidebarContent isPlatform={isPlatform} role={role} companyName={companyName} />
         </Drawer>
       </Box>
 
