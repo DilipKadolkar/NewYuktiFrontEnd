@@ -1,0 +1,1328 @@
+<title>Angular, Animated</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one chapter at a time. Live diagram on the left, explanation + code on the right, interview Q&A below. */
+:root {
+  --bg: #F4F5FA;
+  --surface: #FFFFFF;
+  --surface-2: #EEF0F7;
+  --ink: #1A1E33;
+  --muted: #5A6081;
+  --line: #D9DCEA;
+  --accent: #CF2943;
+  --accent-soft: #FBE3E7;
+  --flow: #0B7F78;
+  --flow-soft: #DDF3F1;
+  --on-flow: #FFFFFF;
+  --ok: #1E7F47;
+  --ok-soft: #DFF3E6;
+  --warn: #A86500;
+  --warn-soft: #FBEFD9;
+  --err: #C0263A;
+  --err-soft: #FBE1E4;
+  --code-bg: #161A2E;
+  --code-fg: #E3E6F3;
+  --code-dim: #8A91B4;
+  --code-str: #9FE0A6;
+  --code-kw: #FF8FA3;
+  --code-dec: #F8C66B;
+  --code-type: #7FD4F0;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1120; --surface: #161A2D; --surface-2: #1E2339; --ink: #E6E8F4; --muted: #9CA2C0; --line: #2B3152;
+    --accent: #FF5C72; --accent-soft: #3A1823; --flow: #2FC2B4; --flow-soft: #12302F; --on-flow: #06201E;
+    --ok: #4FD08A; --ok-soft: #12301F; --warn: #F2B34F; --warn-soft: #36290F; --err: #FF6A7D; --err-soft: #3A1620;
+    --code-bg: #0A0C18; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1120; --surface: #161A2D; --surface-2: #1E2339; --ink: #E6E8F4; --muted: #9CA2C0; --line: #2B3152;
+  --accent: #FF5C72; --accent-soft: #3A1823; --flow: #2FC2B4; --flow-soft: #12302F; --on-flow: #06201E;
+  --ok: #4FD08A; --ok-soft: #12301F; --warn: #F2B34F; --warn-soft: #36290F; --err: #FF6A7D; --err-soft: #3A1620;
+  --code-bg: #0A0C18; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+code, pre, .mono { font-family: var(--mono); }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Hero */
+.hero { display: grid; gap: 8px; margin-bottom: 20px; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.05; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p { margin: 0; color: var(--muted); max-width: 64ch; }
+
+/* Chapter tabs */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 8; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.tabs ol { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+.tabs a { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; text-decoration: none; color: var(--muted); padding: 7px 12px; border-radius: 999px; border: 1px solid transparent; font-weight: 500; font-size: 14px; }
+.tabs a span { font-family: var(--mono); font-size: 11px; opacity: .7; }
+.tabs a:hover { color: var(--ink); border-color: var(--line); }
+.tabs a[aria-current="page"] { background: var(--ink); color: var(--bg); }
+
+/* Chapter */
+.ch-head { display: grid; gap: 6px; margin-bottom: 18px; }
+.eyebrow { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); font-weight: 600; }
+.ch-head h2 { font-size: clamp(1.6rem, 3.6vw, 2.3rem); font-weight: 700; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.ch-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 920px) { .ch-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.stage-wrap { display: grid; gap: 12px; min-width: 0; }
+.stage { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow: hidden; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; border-radius: 8px; font-weight: 500; font-size: 14px; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.sm { padding: 4px 10px; font-size: 13px; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
+
+.log { list-style: none; margin: 0; padding: 12px 14px; background: var(--surface-2); border-radius: 10px; font-size: 13.5px; min-height: 112px; display: grid; gap: 4px; align-content: start; }
+.log li { display: flex; gap: 8px; animation: logIn .35s ease; }
+.log li::before { content: "›"; color: var(--accent); font-weight: 700; }
+.log li.err { color: var(--err); }
+.log li.good { color: var(--ok); }
+@keyframes logIn { from { opacity: 0; transform: translateY(4px); } }
+
+.explain { display: grid; gap: 14px; min-width: 0; }
+.explain h3 { font-size: 1.1rem; }
+.points { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.points b { color: var(--ink); }
+.explain p { margin: 0; }
+pre.code { margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 14px 16px; font-size: 12.8px; line-height: 1.6; overflow-x: auto; }
+.code-label { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: -8px; }
+.t0 { color: var(--code-dim); font-style: italic; } .t1 { color: var(--code-str); } .t2 { color: var(--code-dec); } .t3 { color: var(--code-kw); } .t4 { color: var(--code-type); }
+
+/* Q&A */
+.qa { margin-top: 32px; display: grid; gap: 10px; }
+.qa h3 { font-size: 1.25rem; }
+.qa details { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0 16px; }
+.qa summary { cursor: pointer; padding: 12px 0; font-weight: 600; list-style: none; display: flex; gap: 10px; }
+.qa summary::-webkit-details-marker { display: none; }
+.qa summary::before { content: "+"; font-family: var(--mono); color: var(--accent); width: 1ch; }
+.qa details[open] summary::before { content: "−"; }
+.qa details > div { padding-bottom: 14px; color: var(--muted); max-width: 75ch; display: grid; gap: 8px; }
+.qa details > div p { margin: 0; }
+.qa code { font-size: 13px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+.pager a { text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--surface); padding: 10px 14px; border-radius: 10px; font-weight: 500; }
+.pager a:hover { border-color: var(--ink); }
+.pager .next { margin-left: auto; }
+
+/* Shared animated bits */
+.packet { position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none; background: var(--flow); color: var(--on-flow); font-family: var(--mono); font-size: 11.5px; font-weight: 500; padding: 3px 9px; border-radius: 999px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.packet.alt { background: var(--accent); color: #fff; }
+.pulse { animation: pulse .7s ease; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--flow); } 100% { box-shadow: 0 0 0 12px transparent; } }
+.box { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; transition: background .3s, border-color .3s, opacity .3s; }
+.box-title { font-family: var(--mono); font-size: 12.5px; font-weight: 500; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.box-title span { color: var(--muted); font-weight: 400; }
+.tag-chip { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--flow-soft); color: var(--flow); white-space: nowrap; }
+
+/* 1. Components */
+.comp-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1.1fr); gap: 18px; align-items: center; }
+.files { display: grid; gap: 10px; }
+.file { font-family: var(--mono); font-size: 12px; display: grid; gap: 2px; }
+.file small { font-family: var(--body); color: var(--muted); font-size: 12px; }
+.ftag { display: inline-block; font-size: 10px; font-weight: 600; padding: 0 5px; border-radius: 4px; margin-right: 4px; color: #fff; }
+.ftag.ts { background: #3178C6; } .ftag.html { background: #D9531E; } .ftag.css { background: #7A4FCF; }
+.decorator { text-align: center; border: 2px dashed var(--accent); border-radius: 12px; padding: 16px 8px; font-family: var(--display); font-weight: 700; font-size: 1.15rem; color: var(--accent); background: var(--accent-soft); display: grid; gap: 4px; }
+.decorator small { font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--ink); }
+.dom-tree { font-family: var(--mono); font-size: 12px; display: grid; gap: 6px; }
+.dom-tree .indent { margin-left: 16px; }
+.slot { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 8px; transition: border-color .3s, background .3s; }
+.slot.lit { border-color: var(--flow); background: var(--flow-soft); }
+.rendered { margin-top: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; font-family: var(--body); transition: opacity .4s, transform .4s; }
+.rendered.gone { opacity: 0; transform: scale(.9); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 13px; flex: none; }
+.rendered b { display: block; font-size: 13.5px; }
+.rendered small { color: var(--muted); font-size: 12px; }
+.rendered .mini { margin-left: auto; font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--accent); color: var(--accent); background: transparent; }
+.lifecycle { display: grid; gap: 8px; }
+.lifecycle h4 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.hooks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.hook { font-family: var(--mono); font-size: 12px; padding: 5px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); transition: all .3s; }
+.hook.on { background: var(--accent); border-color: var(--accent); color: #fff; transform: translateY(-2px); }
+.hook.done { color: var(--ink); border-color: var(--ok); background: var(--ok-soft); }
+.hooks .arrow { color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) { .comp-stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* 2. Binding */
+.bind-stage { display: grid; grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.bind-stage .box { display: grid; gap: 10px; align-content: start; }
+.prop { font-family: var(--mono); font-size: 13px; padding: 7px 9px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prop b { color: var(--accent); font-weight: 500; }
+.lanes { display: grid; gap: 8px; align-content: center; }
+.lane-row { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; text-align: center; transition: all .3s; background: var(--surface); }
+.lane-row code { font-size: 13px; font-weight: 500; display: block; }
+.lane-row small { display: block; font-size: 11px; color: var(--muted); }
+.lane-row .dir { font-size: 15px; color: var(--muted); }
+.lane-row.on { border-color: var(--flow); background: var(--flow-soft); transform: scale(1.04); }
+.lane-row.on .dir { color: var(--flow); }
+.vrow { display: grid; gap: 4px; }
+.vrow > code { font-size: 11.5px; color: var(--muted); }
+.vrow h3 { font-family: var(--body); font-size: 1.15rem; }
+.vrow input[type=text] { font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); width: 100%; }
+.like { justify-self: start; border: 0; background: var(--accent); color: #fff; padding: 7px 14px; border-radius: 7px; font-weight: 500; }
+.like:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+@media (max-width: 700px) {
+  .bind-stage { grid-template-columns: minmax(0, 1fr); }
+  .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lane-row .dir { transform: rotate(90deg); display: inline-block; }
+}
+
+/* 3. Services */
+.svc-stage { display: grid; gap: 34px; }
+.svc { border: 2px solid var(--flow); background: var(--flow-soft); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; justify-self: center; width: min(100%, 460px); }
+.svc .box-title { font-size: 14px; }
+.svc-state { font-family: var(--mono); font-size: 12.5px; color: var(--ink); overflow-wrap: anywhere; }
+.svc-comps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; position: relative; }
+.svc-comps::before { content: ""; position: absolute; left: 16%; right: 16%; top: -22px; border-top: 2px dashed var(--line); }
+.svc-comps .box { display: grid; gap: 8px; align-content: start; position: relative; }
+.svc-comps .box::before { content: ""; position: absolute; left: 50%; top: -23px; height: 22px; border-left: 2px dashed var(--line); }
+.inj { font-family: var(--mono); font-size: 11px; color: var(--flow); }
+.prod { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 13px; }
+.prod span small { color: var(--muted); display: block; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.badge-wrap { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.badge { min-width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-variant-numeric: tabular-nums; transition: transform .25s; }
+.checkout-list { margin: 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 2px; }
+.checkout-list li { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.total { border-top: 1px solid var(--line); padding-top: 6px; display: flex; justify-content: space-between; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+@media (max-width: 640px) { .svc-comps { grid-template-columns: minmax(0, 1fr); } .svc-comps::before, .svc-comps .box::before { display: none; } .svc-stage { gap: 16px; } }
+
+/* 4. DI */
+.di-stage { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; }
+.tree { display: grid; gap: 14px; }
+.inj-box { position: relative; }
+.inj-box:not(:last-child)::after { content: "↑ parent"; position: absolute; left: 50%; bottom: -14px; transform: translate(-50%, 50%); font-size: 10.5px; color: var(--muted); background: var(--surface); padding: 0 4px; font-family: var(--mono); z-index: 1; }
+.inj-box .prov { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.inj-box .state { font-size: 11.5px; font-weight: 600; float: right; }
+.inj-box.checking { border-color: var(--warn); background: var(--warn-soft); }
+.inj-box.miss { opacity: .55; }
+.inj-box.found { border-color: var(--ok); background: var(--ok-soft); }
+.inj-box.error { border-color: var(--err); background: var(--err-soft); }
+.inj-box.asker { border-color: var(--accent); }
+.instances { display: grid; gap: 8px; align-content: start; }
+.instances h4 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.inst { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); display: grid; gap: 2px; animation: logIn .4s ease; }
+.inst small { font-family: var(--body); color: var(--muted); }
+.inst .uses { color: var(--flow); }
+.empty { color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { .di-stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* 5. Routing */
+.route-stage { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; }
+.browser { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); display: grid; align-content: start; }
+.bar { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.dots { display: flex; gap: 4px; flex: none; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.url { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.url b { color: var(--accent); font-weight: 500; }
+.appnav { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.appnav button { border: 0; background: none; color: var(--flow); font-size: 13px; padding: 3px 6px; border-radius: 5px; text-decoration: underline; text-underline-offset: 3px; }
+.appnav button:hover { background: var(--flow-soft); }
+.outlet { margin: 10px; border: 2px dashed var(--line); border-radius: 8px; padding: 22px 12px 12px; position: relative; min-height: 150px; }
+.outlet-tag { position: absolute; top: -9px; left: 10px; font-family: var(--mono); font-size: 11px; background: var(--surface); padding: 0 5px; color: var(--muted); }
+.view h4 { margin: 0 0 4px; font-family: var(--display); font-size: 1.05rem; }
+.view .cname { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+.view p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.view ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.view button.link { border: 0; background: none; padding: 0; color: var(--flow); text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+.routes { display: grid; gap: 6px; align-content: start; }
+.rt { font-family: var(--mono); font-size: 11.5px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); transition: all .2s; overflow-wrap: anywhere; }
+.rt.scan { border-color: var(--warn); background: var(--warn-soft); }
+.rt.miss { opacity: .5; }
+.rt.hit { border-color: var(--ok); background: var(--ok-soft); opacity: 1; }
+.rt.blocked { border-color: var(--err); background: var(--err-soft); opacity: 1; }
+.rt .g { color: var(--accent); }
+.params { font-family: var(--mono); font-size: 12px; color: var(--muted); min-height: 1.6em; }
+@media (max-width: 640px) { .route-stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* 6. Observables */
+.obs-stage { display: grid; gap: 4px; --now: 0%; }
+.olane { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; align-items: center; }
+.olane .lname { font-family: var(--mono); font-size: 12px; font-weight: 500; text-align: right; }
+.track { position: relative; height: 46px; }
+.track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px solid var(--line); }
+.track::after { content: ""; position: absolute; top: 4px; bottom: 4px; left: var(--now); border-left: 2px solid var(--accent); opacity: var(--now-op, 0); }
+.op { margin-left: 84px; font-family: var(--mono); font-size: 12px; padding: 4px 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; justify-self: start; }
+.op b { color: var(--accent); font-weight: 500; }
+.marble { position: absolute; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; font-weight: 600; background: var(--flow); color: var(--on-flow); z-index: 1; }
+.marble.wide { width: 36px; margin-left: -18px; border-radius: 18px; background: var(--accent); color: #fff; }
+.marble.out { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--muted); }
+.marble.out::after { content: ""; position: absolute; inset: 13px -4px auto; border-top: 2px solid var(--err); transform: rotate(-35deg); }
+.marble.pop { animation: pop .35s ease; }
+.marble.drop { animation: drop .45s cubic-bezier(.3,1.4,.6,1); }
+@keyframes pop { from { transform: scale(0); } }
+@keyframes drop { from { transform: translateY(-34px); opacity: 0; } }
+.done-bar { position: absolute; top: 50%; width: 3px; height: 26px; margin-top: -13px; background: var(--ink); border-radius: 2px; }
+.obs-note { font-size: 13px; color: var(--muted); margin: 6px 0 0 84px; }
+@media (max-width: 520px) { .olane { grid-template-columns: 56px minmax(0, 1fr); } .op, .obs-note { margin-left: 0; } .olane .lname { font-size: 10.5px; } }
+
+/* 7. Forms */
+.form-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.f-form { display: grid; gap: 12px; align-content: start; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 13px; font-weight: 600; }
+.field input { font: inherit; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); transition: border-color .25s, box-shadow .25s; }
+.field input.ng-invalid.show { border-color: var(--err); box-shadow: 0 0 0 3px var(--err-soft); }
+.field input.ng-valid.ng-dirty { border-color: var(--ok); }
+.ferr { font-size: 12.5px; color: var(--err); margin: 0; animation: slideIn .3s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(-4px); } }
+.f-ok { color: var(--ok); font-size: 13.5px; margin: 0; }
+.inspector { display: grid; gap: 8px; align-content: start; font-family: var(--mono); font-size: 12px; }
+.inspector h4 { margin: 0; font-family: var(--body); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.ictl { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; display: grid; gap: 4px; background: var(--surface-2); }
+.ictl .top { display: flex; justify-content: space-between; gap: 6px; align-items: center; flex-wrap: wrap; }
+.st { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; font-weight: 600; transition: background .3s, color .3s; }
+.st.VALID { background: var(--ok-soft); color: var(--ok); }
+.st.INVALID { background: var(--err-soft); color: var(--err); }
+.flags { display: flex; gap: 4px; flex-wrap: wrap; }
+.flag { font-size: 10.5px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); transition: all .3s; }
+.flag.on { border-color: var(--flow); color: var(--flow); background: var(--flow-soft); }
+.errs { color: var(--err); overflow-wrap: anywhere; }
+.errs.none { color: var(--muted); }
+.ictl.form { border-color: var(--ink); }
+@media (max-width: 680px) { .form-stage { grid-template-columns: minmax(0, 1fr); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Angular interview prep · for beginners</p>
+    <h1>Angular, <em>Animated</em></h1>
+    <p>Seven core ideas, each with a diagram you can play with. Press the buttons in each chapter and watch data move between the pieces of an Angular app. Then test yourself with the interview questions at the bottom of each chapter.</p>
+  </header>
+
+  <nav class="tabs" aria-label="Chapters">
+    <ol>
+      <li><a href="#components"><span>1</span>Components</a></li>
+      <li><a href="#binding"><span>2</span>Data binding</a></li>
+      <li><a href="#services"><span>3</span>Services</a></li>
+      <li><a href="#di"><span>4</span>Dependency injection</a></li>
+      <li><a href="#routing"><span>5</span>Routing</a></li>
+      <li><a href="#observables"><span>6</span>Observables</a></li>
+      <li><a href="#forms"><span>7</span>Form validation</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============ 1. COMPONENTS ============ -->
+  <section class="chapter" data-ch="components">
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 1 · The building block</p>
+      <h2>Components</h2>
+      <p class="lede">Every screen in Angular is a tree of components. A component is three things glued together by the <code>@Component</code> decorator: a TypeScript class (data and behaviour), an HTML template (what it looks like) and CSS (how it is styled).</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage comp-stage" id="st-comp">
+          <div class="files">
+            <div class="box file" id="f-ts"><div><span class="ftag ts">TS</span>user-card.component.ts</div><small>Class: data and methods</small></div>
+            <div class="box file" id="f-html"><div><span class="ftag html">HTML</span>user-card.component.html</div><small>Template: what the user sees</small></div>
+            <div class="box file" id="f-css"><div><span class="ftag css">CSS</span>user-card.component.css</div><small>Styles: scoped to this component</small></div>
+          </div>
+          <div class="decorator" id="f-dec">@Component<small>selector: 'app-user-card'</small></div>
+          <div class="dom-tree" id="f-dom">
+            <div>&lt;app-root&gt;</div>
+            <div class="indent">&lt;app-header&gt;</div>
+            <div class="indent slot lit" id="f-slot">&lt;app-user-card&gt;
+              <div class="rendered" id="f-card"><div class="avatar">AR</div><div><b>Asha Rao</b><small>Frontend Developer</small></div><button class="mini" type="button" tabindex="-1">Follow</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="btn primary" type="button" id="btn-build">▶ Build the component</button>
+          <button class="btn" type="button" id="btn-life">▶ Run lifecycle hooks</button>
+        </div>
+        <div class="stage lifecycle">
+          <h4>Lifecycle hooks, in the order Angular calls them</h4>
+          <div class="hooks" id="hooks"></div>
+        </div>
+        <ul class="log" id="log-comp" aria-live="polite"><li>Press “Build the component” to see how the three files become one element on the page.</li></ul>
+      </div>
+      <div class="explain">
+        <h3>What to remember</h3>
+        <ul class="points">
+          <li><b>Selector</b> is the custom HTML tag. Writing <code>&lt;app-user-card&gt;</code> in a parent template places this component there.</li>
+          <li><b>Standalone</b> is the default since Angular 17. The component lists what it uses in its own <code>imports</code>, with no NgModule needed.</li>
+          <li><b>Inputs and outputs</b> let a parent pass data in and listen to events coming out.</li>
+          <li><b>Lifecycle hooks</b> let you run code at set moments. Use <code>ngOnInit</code> for setup and <code>ngOnDestroy</code> for clean-up.</li>
+        </ul>
+        <div class="code-label">user-card.component.ts</div>
+<pre class="code" data-lang="ts"><code>import { Component, input, output, OnInit } from '@angular/core';
+
+@Component({
+  selector: 'app-user-card',
+  standalone: true,
+  templateUrl: './user-card.component.html',
+  styleUrl: './user-card.component.css'
+})
+export class UserCardComponent implements OnInit {
+  name = input.required&lt;string&gt;();   // data in from parent
+  followed = output&lt;string&gt;();        // event out to parent
+
+  ngOnInit() {
+    console.log('Card ready for', this.name());
+  }
+  follow() { this.followed.emit(this.name()); }
+}</code></pre>
+        <div class="code-label">parent template</div>
+<pre class="code" data-lang="html"><code>&lt;app-user-card [name]="'Asha Rao'" (followed)="onFollow($event)" /&gt;</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>What is a component in Angular?</summary><div><p>A component is the basic UI building block. It is a TypeScript class decorated with <code>@Component</code>, which supplies its metadata: a <code>selector</code> (the HTML tag), a template and styles. An Angular app is a tree of components starting from the root component.</p></div></details>
+      <details><summary>What is the difference between the constructor and ngOnInit?</summary><div><p>The constructor is a TypeScript feature that runs when the class is created. Use it only for dependency injection. <code>ngOnInit</code> is an Angular hook that runs once, after Angular has set the first input values. Put setup logic there, such as loading data, because inputs are available by then.</p></div></details>
+      <details><summary>List the lifecycle hooks in order.</summary><div><p><code>ngOnChanges</code> (whenever an input changes) → <code>ngOnInit</code> (once) → <code>ngDoCheck</code> → <code>ngAfterContentInit</code> → <code>ngAfterContentChecked</code> → <code>ngAfterViewInit</code> → <code>ngAfterViewChecked</code> → <code>ngOnDestroy</code> (just before removal). Content hooks relate to projected <code>&lt;ng-content&gt;</code>; view hooks relate to the component's own template and children.</p></div></details>
+      <details><summary>How do components talk to each other?</summary><div><p>Parent to child: <code>@Input()</code> or <code>input()</code>. Child to parent: <code>@Output()</code> with <code>EventEmitter</code>, or <code>output()</code>. Unrelated components: a shared service (chapter 3). Parent reading a child directly: <code>@ViewChild</code> or <code>viewChild()</code>.</p></div></details>
+      <details><summary>What are standalone components?</summary><div><p>Components that declare their own dependencies in an <code>imports</code> array instead of belonging to an NgModule. They were introduced in v14 and became the default in v17. Apps start with <code>bootstrapApplication(AppComponent, appConfig)</code>.</p></div></details>
+      <details><summary>What is view encapsulation?</summary><div><p>It controls how component CSS is scoped. The default, <code>Emulated</code>, adds unique attributes so styles apply only to that component. <code>ShadowDom</code> uses the browser's Shadow DOM. <code>None</code> makes the styles global.</p></div></details>
+    </div>
+    <nav class="pager"><a class="next" href="#binding">Next: Data binding →</a></nav>
+  </section>
+
+  <!-- ============ 2. BINDING ============ -->
+  <section class="chapter" data-ch="binding" hidden>
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 2 · Class ⇄ template</p>
+      <h2>Data binding</h2>
+      <p class="lede">Binding keeps the class and the screen in sync without you touching the DOM. There are four kinds, and the brackets tell you which way the data flows. Try it: type in the box, press Like, or lock the button.</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage bind-stage" id="st-bind">
+          <div class="box">
+            <div class="box-title">profile.component.ts <span>class</span></div>
+            <div class="prop" id="b-p-name">name = <b id="b-v-name">'Asha'</b></div>
+            <div class="prop" id="b-p-likes">likes = <b id="b-v-likes">0</b></div>
+            <div class="prop" id="b-p-locked"><span>isLocked = <b id="b-v-locked">false</b></span><button class="btn sm" type="button" id="b-toggle">toggle</button></div>
+          </div>
+          <div class="lanes">
+            <div class="lane-row" id="lane-interp"><code>{{ }}</code><span class="dir">→</span><small>interpolation</small></div>
+            <div class="lane-row" id="lane-prop"><code>[ ]</code><span class="dir">→</span><small>property</small></div>
+            <div class="lane-row" id="lane-event"><code>( )</code><span class="dir">←</span><small>event</small></div>
+            <div class="lane-row" id="lane-two"><code>[( )]</code><span class="dir">⇄</span><small>two-way</small></div>
+          </div>
+          <div class="box">
+            <div class="box-title">profile.component.html <span>rendered</span></div>
+            <div class="vrow"><code>&lt;h3&gt;Hello {{ name }}&lt;/h3&gt;</code><h3 id="b-h3">Hello Asha</h3></div>
+            <div class="vrow"><code>[disabled]="isLocked" (click)="like()"</code><button class="like" type="button" id="b-like">♥ Like (0)</button></div>
+            <div class="vrow"><code>[(ngModel)]="name"</code><input type="text" id="b-input" value="Asha" aria-label="Name, two-way bound" autocomplete="off"></div>
+          </div>
+        </div>
+        <ul class="log" id="log-bind" aria-live="polite"><li>Teal pills are data moving. Watch which lane lights up for each action.</li></ul>
+      </div>
+      <div class="explain">
+        <h3>The four bindings</h3>
+        <ul class="points">
+          <li><b><code>{{ value }}</code> Interpolation</b>: class → view. Shows a value as text.</li>
+          <li><b><code>[property]="value"</code> Property binding</b>: class → view. Sets a DOM or child property such as <code>disabled</code>, <code>src</code> or an input.</li>
+          <li><b><code>(event)="handler()"</code> Event binding</b>: view → class. Runs a method on click, keyup, submit and so on.</li>
+          <li><b><code>[(ngModel)]="value"</code> Two-way binding</b>: both ways. It is shorthand for <code>[ngModel]</code> plus <code>(ngModelChange)</code>, nicknamed “banana in a box”.</li>
+        </ul>
+<pre class="code" data-lang="ts"><code>@Component({
+  selector: 'app-profile',
+  imports: [FormsModule],   // needed for ngModel
+  templateUrl: './profile.component.html'
+})
+export class ProfileComponent {
+  name = 'Asha';
+  likes = 0;
+  isLocked = false;
+  like() { this.likes++; }
+}</code></pre>
+<pre class="code" data-lang="html"><code>&lt;h3&gt;Hello {{ name }}&lt;/h3&gt;
+&lt;button [disabled]="isLocked" (click)="like()"&gt;
+  Like ({{ likes }})
+&lt;/button&gt;
+&lt;input [(ngModel)]="name" /&gt;</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>What types of data binding does Angular support?</summary><div><p>Interpolation <code>{{ }}</code> and property binding <code>[ ]</code> go from component to view. Event binding <code>( )</code> goes from view to component. Two-way binding <code>[( )]</code> combines a property and an event binding.</p></div></details>
+      <details><summary>How does two-way binding work internally?</summary><div><p><code>[(x)]="v"</code> expands to <code>[x]="v" (xChange)="v = $event"</code>. Any component with an input <code>x</code> and an output <code>xChange</code> supports it. With signals you can use <code>model()</code>. For form inputs, <code>ngModel</code> from <code>FormsModule</code> provides the pair.</p></div></details>
+      <details><summary>Property binding vs attribute binding?</summary><div><p>Property binding sets a DOM property (<code>[value]</code>). Some HTML attributes have no matching property, such as <code>aria-*</code>, <code>colspan</code> or <code>data-*</code>. For those, use attribute binding: <code>[attr.aria-label]="label"</code>. There are also <code>[class.active]="on"</code> and <code>[style.width.px]="w"</code>.</p></div></details>
+      <details><summary>What is change detection?</summary><div><p>It is how Angular decides when to update the view. Traditionally zone.js notices async events such as clicks, timers and HTTP calls, and Angular then re-checks bindings. <code>ChangeDetectionStrategy.OnPush</code> checks a component only when its inputs change, an event fires inside it, or an async pipe emits. Signals allow fine-grained, zoneless updates in newer versions.</p></div></details>
+    </div>
+    <nav class="pager"><a href="#components">← Components</a><a class="next" href="#services">Next: Services →</a></nav>
+  </section>
+
+  <!-- ============ 3. SERVICES ============ -->
+  <section class="chapter" data-ch="services" hidden>
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 3 · Shared logic</p>
+      <h2>Services</h2>
+      <p class="lede">A service is a plain class for work that does not belong to a single screen: holding shared state, calling APIs, logging. Here three unrelated components share one <code>CartService</code>. Add products and watch every component update from the same instance.</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage svc-stage" id="st-svc">
+          <div class="svc" id="s-svc">
+            <div class="box-title">CartService <span class="tag-chip">providedIn: 'root' · one shared instance</span></div>
+            <div class="svc-state">items = [<span id="s-items"></span>]</div>
+          </div>
+          <div class="svc-comps">
+            <div class="box" id="s-c-list">
+              <div class="box-title">ProductListComponent</div>
+              <div class="inj">cart = inject(CartService)</div>
+              <div id="s-products"></div>
+            </div>
+            <div class="box" id="s-c-head">
+              <div class="box-title">HeaderComponent</div>
+              <div class="inj">cart = inject(CartService)</div>
+              <div class="badge-wrap">Cart <span class="badge" id="s-badge">1</span></div>
+            </div>
+            <div class="box" id="s-c-check">
+              <div class="box-title">CheckoutComponent</div>
+              <div class="inj">cart = inject(CartService)</div>
+              <ul class="checkout-list" id="s-check-list"></ul>
+              <div class="total"><span>Total</span><span id="s-total"></span></div>
+              <button class="btn sm" type="button" id="s-clear">Clear cart</button>
+            </div>
+          </div>
+        </div>
+        <ul class="log" id="log-svc" aria-live="polite"><li>Press “Add” on a product. The component asks the service, and the service's state feeds every component.</li></ul>
+      </div>
+      <div class="explain">
+        <h3>Why use services</h3>
+        <ul class="points">
+          <li><b>Single responsibility</b>: components handle the view, services handle data and business logic.</li>
+          <li><b>Share state</b> between components that are not parent and child.</li>
+          <li><b>Reuse</b> logic such as API calls, auth or formatting in many places.</li>
+          <li><b>Easy to test</b>: swap a real service for a fake one in unit tests.</li>
+        </ul>
+        <div class="code-label">cart.service.ts</div>
+<pre class="code" data-lang="ts"><code>import { Injectable, signal, computed } from '@angular/core';
+
+@Injectable({ providedIn: 'root' })   // one instance for the whole app
+export class CartService {
+  private items = signal&lt;Product[]&gt;([]);
+  readonly count = computed(() =&gt; this.items().length);
+
+  add(p: Product) { this.items.update(list =&gt; [...list, p]); }
+  clear() { this.items.set([]); }
+}</code></pre>
+        <div class="code-label">header.component.ts</div>
+<pre class="code" data-lang="ts"><code>export class HeaderComponent {
+  cart = inject(CartService);   // same instance as everywhere else
+}
+// template:  Cart {{ cart.count() }}</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>What is a service and why use one?</summary><div><p>A class marked with <code>@Injectable</code> that holds logic or data not tied to one view. It keeps components thin, lets unrelated components share state, and centralises HTTP calls, so the code is easier to reuse and test.</p></div></details>
+      <details><summary>What does providedIn: 'root' mean?</summary><div><p>It registers the service with the root injector, so the whole app gets one shared instance (a singleton). It is also tree-shakable: if nothing injects the service, it is left out of the bundle.</p></div></details>
+      <details><summary>How do you share data between two sibling components?</summary><div><p>Put the data in a service they both inject. Expose it as a signal or as an Observable, usually through a <code>BehaviorSubject</code> with <code>asObservable()</code>, so both components react when it changes.</p></div></details>
+      <details><summary>Can a service have more than one instance?</summary><div><p>Yes. If you list it in a component's <code>providers: [MyService]</code>, that component and its children get their own new instance. This is useful for state scoped to one screen or one widget.</p></div></details>
+    </div>
+    <nav class="pager"><a href="#binding">← Data binding</a><a class="next" href="#di">Next: Dependency injection →</a></nav>
+  </section>
+
+  <!-- ============ 4. DI ============ -->
+  <section class="chapter" data-ch="di" hidden>
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 4 · Who creates the service?</p>
+      <h2>Dependency injection</h2>
+      <p class="lede">Components never write <code>new CartService()</code>. They ask for it, and Angular's injectors hand over an instance. If an injector doesn't have a provider, the request walks up to the parent injector until one does. Try the three requests below.</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage di-stage" id="st-di">
+          <div class="tree">
+            <div class="box inj-box" id="d-null"><span class="state"></span><div class="box-title">NullInjector</div><div class="prov">end of the chain: throws an error</div></div>
+            <div class="box inj-box" id="d-root"><span class="state"></span><div class="box-title">Root injector</div><div class="prov">providers: CartService, HttpClient</div></div>
+            <div class="box inj-box" id="d-app"><span class="state"></span><div class="box-title">AppComponent</div><div class="prov">providers: none</div></div>
+            <div class="box inj-box" id="d-profile"><span class="state"></span><div class="box-title">ProfileComponent</div><div class="prov">providers: [LoggerService]</div></div>
+            <div class="box inj-box asker" id="d-avatar"><span class="state"></span><div class="box-title">AvatarComponent</div><div class="prov">providers: none · the request starts here</div></div>
+          </div>
+          <div class="instances">
+            <h4>Instances Angular created</h4>
+            <div id="d-inst"><p class="empty">None yet. Angular creates an instance only when something first asks for it.</p></div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="btn primary" type="button" data-token="CartService">inject(CartService)</button>
+          <button class="btn primary" type="button" data-token="LoggerService">inject(LoggerService)</button>
+          <button class="btn" type="button" data-token="PaymentService">inject(PaymentService)</button>
+        </div>
+        <ul class="log" id="log-di" aria-live="polite"><li>Press a button. AvatarComponent asks for a dependency and the request climbs the injector tree.</li></ul>
+      </div>
+      <div class="explain">
+        <h3>How resolution works</h3>
+        <ul class="points">
+          <li><b>Provider</b>: tells an injector how to create something (<code>useClass</code>, <code>useValue</code>, <code>useFactory</code>, <code>useExisting</code>).</li>
+          <li><b>Injector</b>: creates instances and caches them. Ask twice, get the same object.</li>
+          <li><b>Hierarchy</b>: element injectors (components) are checked first, then the environment/root injector, then the NullInjector, which throws.</li>
+          <li><b>Benefit</b>: loose coupling. Tests can provide a fake instead of the real class.</li>
+        </ul>
+<pre class="code" data-lang="ts"><code>@Component({
+  selector: 'app-profile',
+  providers: [LoggerService],   // new instance for this subtree
+  template: `&lt;app-avatar /&gt;`
+})
+export class ProfileComponent {}
+
+export class AvatarComponent {
+  // modern style
+  private cart = inject(CartService);
+  // classic style, same result
+  constructor(private logger: LoggerService) {}
+}</code></pre>
+<pre class="code" data-lang="ts"><code>// Providing a value with a token
+export const API_URL = new InjectionToken&lt;string&gt;('API_URL');
+
+providers: [
+  { provide: API_URL, useValue: 'https://api.example.com' },
+  { provide: Logger, useClass: ConsoleLogger }
+]</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>What is dependency injection?</summary><div><p>A design pattern where a class receives its dependencies from outside instead of creating them. Angular's DI system creates, caches and supplies instances. Classes stay loosely coupled and easy to test with mocks.</p></div></details>
+      <details><summary>Explain the hierarchical injector.</summary><div><p>Angular checks the requesting component's element injector, then each parent element injector up the component tree, then the environment injectors (route injectors, then root), then the platform injector. Finally it reaches the NullInjector, which throws <code>NullInjectorError: No provider for X</code>. The first match wins.</p></div></details>
+      <details><summary>inject() vs constructor injection?</summary><div><p>Both give the same instance. <code>inject()</code> is a function you can call in field initialisers, functional guards, interceptors and factories. It also works well with inheritance. It must be called in an injection context, meaning during construction.</p></div></details>
+      <details><summary>What do @Optional, @Self, @SkipSelf and @Host do?</summary><div><p>They change the lookup. <code>@Optional</code> returns <code>null</code> instead of throwing. <code>@Self</code> checks only the current injector. <code>@SkipSelf</code> starts at the parent. <code>@Host</code> stops at the host component. With <code>inject()</code>, pass <code>{ optional: true, self: true, ... }</code>.</p></div></details>
+      <details><summary>useClass vs useValue vs useFactory vs useExisting?</summary><div><p><code>useClass</code> creates an instance of a class. <code>useValue</code> supplies a ready-made value such as config. <code>useFactory</code> runs a function to build it. <code>useExisting</code> aliases one token to another existing provider.</p></div></details>
+    </div>
+    <nav class="pager"><a href="#services">← Services</a><a class="next" href="#routing">Next: Routing →</a></nav>
+  </section>
+
+  <!-- ============ 5. ROUTING ============ -->
+  <section class="chapter" data-ch="routing" hidden>
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 5 · Pages without page reloads</p>
+      <h2>Routing</h2>
+      <p class="lede">The router watches the URL, finds the first matching route in your config and shows that component inside <code>&lt;router-outlet&gt;</code>. Click the links in the fake browser and watch the route table being checked from top to bottom.</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage route-stage" id="st-route">
+          <div class="browser">
+            <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="url">localhost:4200/<b id="r-path"></b></div></div>
+            <div class="appnav" id="r-nav">
+              <button type="button" data-go="">Home</button>
+              <button type="button" data-go="products">Products</button>
+              <button type="button" data-go="products/42">Product 42</button>
+              <button type="button" data-go="admin">Admin</button>
+              <button type="button" data-go="oops">/oops</button>
+            </div>
+            <div class="outlet"><span class="outlet-tag">&lt;router-outlet&gt;</span><div class="view" id="r-view"></div></div>
+          </div>
+          <div class="routes">
+            <div class="box-title">app.routes.ts</div>
+            <div id="r-table"></div>
+            <div class="params" id="r-params"></div>
+            <label class="check"><input type="checkbox" id="r-auth"> User is logged in</label>
+          </div>
+        </div>
+        <ul class="log" id="log-route" aria-live="polite"><li>Click a link in the fake browser. Try Admin with the box unticked, then ticked.</li></ul>
+      </div>
+      <div class="explain">
+        <h3>The moving parts</h3>
+        <ul class="points">
+          <li><b>Routes</b>: an array of <code>{ path, component }</code>, matched in order. Put <code>'**'</code> last.</li>
+          <li><b><code>routerLink</code></b>: changes the URL without a full page reload.</li>
+          <li><b><code>&lt;router-outlet&gt;</code></b>: the placeholder where the matched component appears.</li>
+          <li><b>Params</b>: <code>products/:id</code> captures <code>42</code>. Read it with <code>ActivatedRoute</code> or a component input.</li>
+          <li><b>Guards</b>: <code>canActivate</code> can block navigation or redirect.</li>
+          <li><b>Lazy loading</b>: <code>loadComponent</code> downloads a page's code only when it's visited.</li>
+        </ul>
+<pre class="code" data-lang="ts"><code>export const routes: Routes = [
+  { path: '', component: HomeComponent },
+  { path: 'products', component: ProductListComponent },
+  { path: 'products/:id', component: ProductDetailComponent },
+  { path: 'admin', canActivate: [authGuard],
+    loadComponent: () =&gt; import('./admin.component')
+                          .then(m =&gt; m.AdminComponent) },
+  { path: 'login', component: LoginComponent },
+  { path: '**', component: NotFoundComponent }
+];
+
+export const authGuard: CanActivateFn = () =&gt; {
+  const auth = inject(AuthService);
+  return auth.isLoggedIn() || inject(Router).parseUrl('/login');
+};</code></pre>
+<pre class="code" data-lang="ts"><code>// Reading the :id parameter
+export class ProductDetailComponent {
+  id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+}</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>What is RouterOutlet?</summary><div><p>A directive that marks where the router renders the component for the active route. Child routes need their own nested <code>&lt;router-outlet&gt;</code> in the parent component's template.</p></div></details>
+      <details><summary>Why use routerLink instead of href?</summary><div><p>A plain <code>href</code> makes the browser reload the whole app. <code>routerLink</code> updates the URL with the History API and swaps only the routed component, so app state survives and navigation is instant.</p></div></details>
+      <details><summary>What kinds of route guards exist?</summary><div><p><code>canActivate</code> (enter a route), <code>canActivateChild</code>, <code>canDeactivate</code> (leave a route, for example with unsaved changes), <code>canMatch</code> (whether the route may match at all), and <code>resolve</code> (load data before activating). Modern guards are plain functions that use <code>inject()</code>.</p></div></details>
+      <details><summary>How does lazy loading work?</summary><div><p>Use <code>loadComponent</code> or <code>loadChildren</code> with a dynamic <code>import()</code>. The build tool splits that code into a separate chunk, which downloads only when the route is first visited. This shrinks the initial bundle.</p></div></details>
+      <details><summary>snapshot vs paramMap observable?</summary><div><p><code>route.snapshot.paramMap</code> reads the value once. If the same component stays on screen while the param changes (from /products/1 to /products/2), it won't update. Subscribe to <code>route.paramMap</code> to react to every change, or enable <code>withComponentInputBinding()</code> and receive it as an input.</p></div></details>
+    </div>
+    <nav class="pager"><a href="#di">← Dependency injection</a><a class="next" href="#observables">Next: Observables →</a></nav>
+  </section>
+
+  <!-- ============ 6. OBSERVABLES ============ -->
+  <section class="chapter" data-ch="observables" hidden>
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 6 · Values over time</p>
+      <h2>Observables (RxJS)</h2>
+      <p class="lede">An Observable is a stream that can deliver many values over time, then complete or error. Operators in <code>pipe()</code> transform the stream like stations on a conveyor belt. Read this marble diagram left to right as time passes.</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage obs-stage" id="st-obs">
+          <div class="olane"><span class="lname">source$</span><div class="track" id="o-src"></div></div>
+          <div class="op">pipe( <b>filter</b>(n =&gt; n % 2 === 0) )</div>
+          <div class="olane"><span class="lname">filtered</span><div class="track" id="o-fil"></div></div>
+          <div class="op">pipe( <b>map</b>(n =&gt; n * 10) )</div>
+          <div class="olane"><span class="lname">result$</span><div class="track" id="o-map"></div></div>
+          <p class="obs-note">Each circle is a <code>next</code> value. The black bar is <code>complete</code>. Crossed-out values were dropped by <code>filter</code>.</p>
+        </div>
+        <div class="controls">
+          <button class="btn primary" type="button" id="o-sub">▶ subscribe()</button>
+          <button class="btn" type="button" id="o-unsub" disabled>■ unsubscribe()</button>
+        </div>
+        <ul class="log" id="log-obs" aria-live="polite"><li>This is a finished run. Press subscribe() to play it live. An Observable does nothing until someone subscribes.</li></ul>
+      </div>
+      <div class="explain">
+        <h3>Key ideas</h3>
+        <ul class="points">
+          <li><b>Lazy</b>: nothing runs until <code>subscribe()</code>.</li>
+          <li><b>Three signals</b>: <code>next</code> (a value), <code>error</code> and <code>complete</code>.</li>
+          <li><b>Operators</b> return new Observables: <code>map</code>, <code>filter</code>, <code>debounceTime</code>, <code>switchMap</code>, <code>catchError</code>…</li>
+          <li><b>Unsubscribe</b> from long-lived streams, or memory leaks. The <code>async</code> pipe does it for you.</li>
+          <li><b><code>HttpClient</code></b> returns Observables that emit once and complete.</li>
+        </ul>
+<pre class="code" data-lang="ts"><code>import { interval, take, map, filter } from 'rxjs';
+
+const source$ = interval(800).pipe(take(6), map(i =&gt; i + 1)); // 1..6
+
+const result$ = source$.pipe(
+  filter(n =&gt; n % 2 === 0),
+  map(n =&gt; n * 10)
+);
+
+const sub = result$.subscribe({
+  next: v =&gt; console.log('next', v),   // 20, 40, 60
+  complete: () =&gt; console.log('complete')
+});
+sub.unsubscribe();   // stop early if needed</code></pre>
+        <div class="code-label">real life: HTTP + async pipe</div>
+<pre class="code" data-lang="ts"><code>export class ProductsComponent {
+  private http = inject(HttpClient);
+  products$ = this.http.get&lt;Product[]&gt;('/api/products');
+}</code></pre>
+<pre class="code" data-lang="html"><code>@for (p of products$ | async; track p.id) {
+  &lt;li&gt;{{ p.name }}&lt;/li&gt;
+}</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>Observable vs Promise?</summary><div><p>A Promise is eager: it starts immediately, resolves once and cannot be cancelled. An Observable is lazy: it starts on subscribe, can emit many values, can be cancelled with <code>unsubscribe()</code>, and has operators for transforming streams.</p></div></details>
+      <details><summary>What are Subject, BehaviorSubject and ReplaySubject?</summary><div><p>A Subject is both an Observable and an Observer, so you can push values with <code>next()</code> and they multicast to all subscribers. <code>BehaviorSubject</code> needs an initial value and gives the latest value to new subscribers, which makes it good for state. <code>ReplaySubject(n)</code> replays the last n values to new subscribers.</p></div></details>
+      <details><summary>switchMap vs mergeMap vs concatMap vs exhaustMap?</summary><div><p>All map each value to an inner Observable. <code>switchMap</code> cancels the previous inner one, which suits search-as-you-type. <code>mergeMap</code> runs them all in parallel. <code>concatMap</code> runs them one after another in order. <code>exhaustMap</code> ignores new values while one is running, which prevents double-submitting a login.</p></div></details>
+      <details><summary>How do you avoid memory leaks with subscriptions?</summary><div><p>Prefer the <code>async</code> pipe in templates. In code, use <code>takeUntilDestroyed()</code>, or call <code>unsubscribe()</code> in <code>ngOnDestroy</code>. Streams that complete on their own, such as HTTP calls, are safe, but cleaning up is still good practice.</p></div></details>
+      <details><summary>Cold vs hot Observables?</summary><div><p>A cold Observable starts a fresh producer for each subscriber: every subscribe to an HTTP Observable makes a new request. A hot Observable shares one producer, such as mouse events or a Subject. Use <code>share()</code> or <code>shareReplay()</code> to make a cold one shared.</p></div></details>
+      <details><summary>Signals vs Observables?</summary><div><p>Signals hold a current value and are synchronous. They are ideal for UI state. Observables model events and async streams over time, such as HTTP, websockets and debounced input. Convert between them with <code>toSignal()</code> and <code>toObservable()</code>.</p></div></details>
+    </div>
+    <nav class="pager"><a href="#routing">← Routing</a><a class="next" href="#forms">Next: Form validation →</a></nav>
+  </section>
+
+  <!-- ============ 7. FORMS ============ -->
+  <section class="chapter" data-ch="forms" hidden>
+    <header class="ch-head">
+      <p class="eyebrow">Chapter 7 · Trust no input</p>
+      <h2>Form validation</h2>
+      <p class="lede">With reactive forms, each input is a <code>FormControl</code> with validators, grouped in a <code>FormGroup</code>. Angular re-runs the validators on every keystroke and tracks the control's state. Type in the form and watch the inspector on the right change live.</p>
+    </header>
+    <div class="ch-grid">
+      <div class="stage-wrap">
+        <div class="stage form-stage" id="st-form">
+          <form class="f-form" id="f-form" novalidate>
+            <div class="field"><label for="fc-name">Full name</label><input id="fc-name" data-c="name" autocomplete="off"><div data-err="name"></div></div>
+            <div class="field"><label for="fc-email">Email</label><input id="fc-email" data-c="email" autocomplete="off"><div data-err="email"></div></div>
+            <div class="field"><label for="fc-password">Password</label><input id="fc-password" data-c="password" type="password" autocomplete="new-password"><div data-err="password"></div></div>
+            <div class="field"><label for="fc-confirm">Confirm password</label><input id="fc-confirm" data-c="confirm" type="password" autocomplete="new-password"><div data-err="confirm"></div></div>
+            <div class="controls"><button class="btn primary" type="submit" id="f-submit">Create account</button><button class="btn" type="button" id="f-reset">reset()</button></div>
+            <p class="f-ok" id="f-ok" hidden></p>
+          </form>
+          <div class="inspector" id="f-inspect"><h4>Live form state</h4></div>
+        </div>
+      </div>
+      <div class="explain">
+        <h3>What the inspector shows</h3>
+        <ul class="points">
+          <li><b>status</b>: <code>VALID</code> or <code>INVALID</code> (also <code>PENDING</code> for async validators, and <code>DISABLED</code>).</li>
+          <li><b>touched / untouched</b>: whether the user has left the field (blur).</li>
+          <li><b>dirty / pristine</b>: whether the user has changed the value.</li>
+          <li><b>errors</b>: an object such as <code>{ required: true }</code>, or <code>null</code> when valid.</li>
+          <li>Show messages only when <code>invalid &amp;&amp; (touched || dirty)</code>, so you don't shout at users before they type.</li>
+        </ul>
+<pre class="code" data-lang="ts"><code>export class SignupComponent {
+  private fb = inject(FormBuilder);
+
+  form = this.fb.group({
+    name:     ['', [Validators.required, Validators.minLength(3)]],
+    email:    ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required, Validators.minLength(8), hasNumber]],
+    confirm:  ['', Validators.required]
+  }, { validators: passwordsMatch });   // cross-field rule
+
+  submit() {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    console.log(this.form.value);
+  }
+}
+
+// custom validator: returns null when valid
+export const hasNumber: ValidatorFn = c =&gt;
+  /\d/.test(c.value) ? null : { noNumber: true };</code></pre>
+<pre class="code" data-lang="html"><code>&lt;form [formGroup]="form" (ngSubmit)="submit()"&gt;
+  &lt;input formControlName="email" /&gt;
+  @if (form.controls.email.touched &amp;&amp; form.controls.email.hasError('email')) {
+    &lt;small&gt;Enter a valid email address&lt;/small&gt;
+  }
+  &lt;button [disabled]="form.invalid"&gt;Create account&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+      </div>
+    </div>
+    <div class="qa">
+      <h3>Interview questions</h3>
+      <details><summary>Template-driven vs reactive forms?</summary><div><p>Template-driven forms (<code>FormsModule</code>, <code>ngModel</code>) define the form in HTML. They are quick for simple forms, but logic is spread across the template. Reactive forms (<code>ReactiveFormsModule</code>) define the form model in TypeScript. They are explicit, synchronous, strongly typed and easier to unit test, so they are preferred for complex forms.</p></div></details>
+      <details><summary>Which built-in validators exist?</summary><div><p><code>required</code>, <code>requiredTrue</code>, <code>minLength</code>, <code>maxLength</code>, <code>min</code>, <code>max</code>, <code>email</code>, <code>pattern</code>, plus <code>Validators.compose</code> to combine them.</p></div></details>
+      <details><summary>How do you write a custom or cross-field validator?</summary><div><p>A validator is a function <code>(control) =&gt; ValidationErrors | null</code>. For cross-field rules such as matching passwords, attach it to the <code>FormGroup</code> so it can read sibling controls. Async validators return an Observable or a Promise, and the status becomes <code>PENDING</code> while they run.</p></div></details>
+      <details><summary>setValue vs patchValue?</summary><div><p><code>setValue</code> needs a value for every control in the group and throws otherwise. <code>patchValue</code> updates only the keys you pass. Both trigger validation unless you pass <code>{ emitEvent: false }</code>.</p></div></details>
+      <details><summary>How do you validate only when the user leaves a field?</summary><div><p>Set <code>updateOn: 'blur'</code> on the control or group, for example <code>this.fb.control('', { validators: [...], updateOn: 'blur' })</code>. Use <code>'submit'</code> to validate only on submit.</p></div></details>
+    </div>
+    <nav class="pager"><a href="#observables">← Observables</a><a class="next" href="#components">Back to start: Components ↺</a></nav>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sleep = ms => new Promise(r => setTimeout(r, RM ? Math.min(ms, 80) : ms));
+
+  /* ---------- syntax highlight ---------- */
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function hl(src, lang) {
+    const re = lang === 'html'
+      ? /(<!--[\s\S]*?-->)|("[^"]*")|(<\/?[\w-]+|\/?>)|(\{\{[\s\S]*?\}\}|@if|@for|@else|\|\s*async)|(\[\(?[\w.-]+\)?\]|\([\w.-]+\)|formControlName|routerLink)/g
+      : /(\/\/.*$)|('[^']*'|"[^"]*"|`[^`]*`)|(@\w+)|\b(import|export|from|class|const|let|return|new|private|readonly|implements|this|if|true|false|null|of)\b|\b([A-Z]\w*)\b/gm;
+    let out = '', last = 0;
+    src.replace(re, (m, ...g) => {
+      const idx = g[g.length - 2];
+      const k = g.slice(0, 5).findIndex(x => x !== undefined);
+      out += esc(src.slice(last, idx)) + `<span class="t${k}">${esc(m)}</span>`;
+      last = idx + m.length;
+      return m;
+    });
+    return out + esc(src.slice(last));
+  }
+  $$('pre.code code').forEach(c => { c.innerHTML = hl(c.textContent, c.parentElement.dataset.lang); });
+
+  /* ---------- shared animation helpers ---------- */
+  function center(el, stage) {
+    const a = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    return { x: a.left - s.left + a.width / 2, y: a.top - s.top + a.height / 2 };
+  }
+  function fly(stage, from, to, label, cls = '') {
+    const p = document.createElement('div');
+    p.className = 'packet ' + cls;
+    p.textContent = label;
+    stage.appendChild(p);
+    const a = center(from, stage), b = center(to, stage);
+    const w = p.offsetWidth, h = p.offsetHeight;
+    const at = (pt, s) => `translate(${pt.x - w / 2}px, ${pt.y - h / 2}px) scale(${s})`;
+    const anim = p.animate([
+      { transform: at(a, .6), opacity: 0 },
+      { transform: at(a, 1), opacity: 1, offset: .12 },
+      { transform: at(b, 1), opacity: 1, offset: .88 },
+      { transform: at(b, .7), opacity: 0 }
+    ], { duration: RM ? 1 : 950, easing: 'cubic-bezier(.45,0,.3,1)' });
+    return anim.finished.then(() => p.remove(), () => p.remove());
+  }
+  function flash(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+  function logger(id) {
+    const ul = $('#' + id);
+    return (msg, opts = {}) => {
+      if (opts.reset) ul.innerHTML = '';
+      const li = document.createElement('li');
+      li.textContent = msg;
+      if (opts.cls) li.className = opts.cls;
+      ul.appendChild(li);
+      while (ul.children.length > 6) ul.firstElementChild.remove();
+    };
+  }
+  function locked(fn) {
+    let busy = false;
+    return async (...a) => { if (busy) return; busy = true; try { await fn(...a); } finally { busy = false; } };
+  }
+
+  /* ---------- chapter routing (hash) ---------- */
+  const chapters = $$('.chapter');
+  const names = chapters.map(c => c.dataset.ch);
+  function show() {
+    const h = location.hash.slice(1);
+    const cur = names.includes(h) ? h : names[0];
+    chapters.forEach(c => { c.hidden = c.dataset.ch !== cur; });
+    $$('.tabs a').forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + cur ? 'page' : 'false'));
+    const tab = $(`.tabs a[href="#${cur}"]`);
+    if (tab) tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return cur;
+  }
+  window.addEventListener('hashchange', () => {
+    show();
+    const tabs = $('.tabs');
+    if (tabs.getBoundingClientRect().top < 0 || window.scrollY > tabs.offsetTop) window.scrollTo({ top: tabs.offsetTop - 4, behavior: RM ? 'auto' : 'smooth' });
+  });
+  show();
+
+  /* ===== 1. Components ===== */
+  {
+    const st = $('#st-comp'), log = logger('log-comp');
+    const card = $('#f-card'), slot = $('#f-slot');
+    $('#btn-build').addEventListener('click', locked(async () => {
+      card.classList.add('gone'); slot.classList.remove('lit');
+      log('The Angular compiler reads the three files…', { reset: true });
+      const parts = [
+        ['f-ts', 'class', 'Class: holds the data (name, role) and methods (follow()).'],
+        ['f-html', 'template', 'Template: HTML plus bindings such as {{ name }}.'],
+        ['f-css', 'styles', 'Styles: scoped, so they cannot leak into other components.']
+      ];
+      for (const [id, label, msg] of parts) {
+        flash($('#' + id));
+        await fly(st, $('#' + id), $('#f-dec'), label);
+        log(msg);
+      }
+      flash($('#f-dec'));
+      log('@Component joins them and registers the selector <app-user-card>.');
+      await sleep(350);
+      await fly(st, $('#f-dec'), slot, '<app-user-card>', 'alt');
+      slot.classList.add('lit'); card.classList.remove('gone');
+      log('A parent template uses <app-user-card>, so Angular renders the component there.', { cls: 'good' });
+    }));
+
+    const hooks = [
+      ['constructor', 'constructor(): the class is created. Only inject dependencies here.'],
+      ['ngOnChanges', 'ngOnChanges(): an input value was set or changed (name = "Asha Rao").'],
+      ['ngOnInit', 'ngOnInit(): runs once after the first inputs arrive. Fetch data here.'],
+      ['ngDoCheck', 'ngDoCheck(): runs on every change-detection pass for custom checks.'],
+      ['ngAfterContentInit', 'ngAfterContentInit(): projected <ng-content> is ready.'],
+      ['ngAfterViewInit', 'ngAfterViewInit(): this component\'s view and children are rendered. @ViewChild refs are ready.'],
+      ['ngOnDestroy', 'ngOnDestroy(): about to be removed. Unsubscribe and clear timers here.']
+    ];
+    const box = $('#hooks');
+    hooks.forEach(([n], i) => {
+      if (i) box.insertAdjacentHTML('beforeend', '<span class="arrow">→</span>');
+      box.insertAdjacentHTML('beforeend', `<span class="hook done" data-h="${n}">${n}</span>`);
+    });
+    $('#btn-life').addEventListener('click', locked(async () => {
+      const els = $$('.hook', box);
+      els.forEach(e => e.classList.remove('on', 'done'));
+      log('Angular creates <app-user-card> and calls its hooks in order:', { reset: true });
+      for (let i = 0; i < hooks.length; i++) {
+        els[i].classList.add('on');
+        log(hooks[i][1], { cls: i === hooks.length - 1 ? 'err' : '' });
+        await sleep(1100);
+        els[i].classList.remove('on'); els[i].classList.add('done');
+      }
+    }));
+  }
+
+  /* ===== 2. Binding ===== */
+  {
+    const st = $('#st-bind'), log = logger('log-bind');
+    const s = { name: 'Asha', likes: 0, locked: false };
+    const like = $('#b-like'), input = $('#b-input');
+    const lane = (k, on) => $('#lane-' + k).classList.toggle('on', on);
+    const renderClass = () => {
+      $('#b-v-name').textContent = `'${s.name}'`;
+      $('#b-v-likes').textContent = s.likes;
+      $('#b-v-locked').textContent = s.locked;
+    };
+
+    $('#b-toggle').addEventListener('click', async () => {
+      s.locked = !s.locked; renderClass(); flash($('#b-p-locked'));
+      lane('prop', true);
+      log(`isLocked changed to ${s.locked} in the class. [disabled] pushes it to the button.`);
+      await fly(st, $('#b-p-locked'), like, `[disabled]=${s.locked}`);
+      like.disabled = s.locked; lane('prop', false);
+    });
+
+    like.addEventListener('click', async () => {
+      lane('event', true);
+      log('(click) event travels from the view to the class and calls like().');
+      await fly(st, like, $('#b-p-likes'), '(click)', 'alt');
+      lane('event', false);
+      s.likes++; renderClass(); flash($('#b-p-likes'));
+      lane('interp', true);
+      await fly(st, $('#b-p-likes'), like, `{{ likes }} → ${s.likes}`);
+      like.textContent = `♥ Like (${s.likes})`; lane('interp', false);
+      log(`likes is now ${s.likes}, and interpolation updated the button text.`, { cls: 'good' });
+    });
+
+    let running = false, again = false;
+    input.addEventListener('input', async () => {
+      if (running) { again = true; return; }
+      running = true;
+      do {
+        again = false;
+        lane('two', true);
+        await fly(st, input, $('#b-p-name'), '(ngModelChange)', 'alt');
+        s.name = input.value; renderClass(); flash($('#b-p-name'));
+        await fly(st, $('#b-p-name'), $('#b-h3'), `{{ name }}`);
+        $('#b-h3').textContent = `Hello ${s.name}`;
+        lane('two', false);
+        log(`Two-way: the view updated name to '${s.name}', and {{ name }} re-rendered the heading.`);
+      } while (again);
+      running = false;
+    });
+  }
+
+  /* ===== 3. Services ===== */
+  {
+    const st = $('#st-svc'), log = logger('log-svc');
+    const products = [{ n: 'Keyboard', p: 1499 }, { n: 'Mouse', p: 699 }, { n: 'Monitor', p: 8999 }];
+    const cart = [products[1]];
+    const inr = v => '₹' + v.toLocaleString('en-IN');
+    const pl = $('#s-products');
+    products.forEach((p, i) => pl.insertAdjacentHTML('beforeend',
+      `<div class="prod"><span>${p.n}<small>${inr(p.p)}</small></span><button class="btn sm" type="button" data-i="${i}">Add</button></div>`));
+    const renderSvc = () => { $('#s-items').textContent = cart.map(c => `'${c.n}'`).join(', '); };
+    const renderHead = () => { $('#s-badge').textContent = cart.length; };
+    const renderCheck = () => {
+      $('#s-check-list').innerHTML = cart.length ? cart.map(c => `<li><span>${c.n}</span><span>${inr(c.p)}</span></li>`).join('') : '<li><span class="empty">Cart is empty</span></li>';
+      $('#s-total').textContent = inr(cart.reduce((a, c) => a + c.p, 0));
+    };
+    renderSvc(); renderHead(); renderCheck();
+
+    async function broadcast() {
+      await Promise.all([
+        fly(st, $('#s-svc'), $('#s-c-head'), `count = ${cart.length}`),
+        fly(st, $('#s-svc'), $('#s-c-check'), `items (${cart.length})`)
+      ]);
+      renderHead(); renderCheck();
+      flash($('#s-c-head')); flash($('#s-c-check'));
+    }
+    const add = locked(async (btn, p) => {
+      log(`ProductListComponent calls cart.add(${p.n}).`, { reset: true });
+      await fly(st, btn, $('#s-svc'), `add(${p.n})`, 'alt');
+      cart.push(p); renderSvc(); flash($('#s-svc'));
+      log('CartService updates its single list of items.');
+      await broadcast();
+      log('Header and Checkout read the same instance, so both update. No @Input chains needed.', { cls: 'good' });
+    });
+    pl.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) add(b, products[+b.dataset.i]); });
+    $('#s-clear').addEventListener('click', locked(async () => {
+      log('CheckoutComponent calls cart.clear().', { reset: true });
+      await fly(st, $('#s-clear'), $('#s-svc'), 'clear()', 'alt');
+      cart.length = 0; renderSvc(); flash($('#s-svc'));
+      await broadcast();
+      log('Every component sees the empty cart.', { cls: 'good' });
+    }));
+  }
+
+  /* ===== 4. DI ===== */
+  {
+    const st = $('#st-di'), log = logger('log-di');
+    const chain = [
+      { id: 'd-avatar', name: 'AvatarComponent', provides: [] },
+      { id: 'd-profile', name: 'ProfileComponent', provides: ['LoggerService'] },
+      { id: 'd-app', name: 'AppComponent', provides: [] },
+      { id: 'd-root', name: 'Root injector', provides: ['CartService', 'HttpClient'] },
+      { id: 'd-null', name: 'NullInjector', provides: null }
+    ];
+    const inst = {};
+    let seq = 0;
+    function renderInst() {
+      const keys = Object.keys(inst);
+      $('#d-inst').innerHTML = keys.length ? keys.map(k => {
+        const v = inst[k];
+        return `<div class="inst"><b>${k} #${v.n}</b><small>created by ${v.where}</small><span class="uses">injected ${v.uses}× · same object every time</span></div>`;
+      }).join('') : '<p class="empty">None yet.</p>';
+    }
+    const request = locked(async token => {
+      chain.forEach(c => { const el = $('#' + c.id); el.classList.remove('checking', 'miss', 'found', 'error'); $('.state', el).textContent = ''; });
+      log(`AvatarComponent runs inject(${token}).`, { reset: true });
+      for (let i = 0; i < chain.length; i++) {
+        const c = chain[i], el = $('#' + c.id), stEl = $('.state', el);
+        if (i) await fly(st, $('#' + chain[i - 1].id), el, token);
+        el.classList.add('checking'); stEl.textContent = 'checking…';
+        await sleep(450);
+        el.classList.remove('checking');
+        if (c.provides === null) {
+          el.classList.add('error'); stEl.textContent = 'throws';
+          log(`NullInjectorError: No provider for ${token}! Fix it with @Injectable({ providedIn: 'root' }) or a providers array.`, { cls: 'err' });
+          return;
+        }
+        if (c.provides.includes(token)) {
+          el.classList.add('found'); stEl.textContent = 'found';
+          if (!inst[token]) { inst[token] = { n: ++seq, where: c.name, uses: 0 }; log(`${c.name} has a provider. It creates ${token} #${inst[token].n} the first time and caches it.`, { cls: 'good' }); }
+          else log(`${c.name} already has ${token} #${inst[token].n} cached, so it returns the same object.`, { cls: 'good' });
+          inst[token].uses++;
+          if (i) await fly(st, el, $('#d-avatar'), `${token} #${inst[token].n}`, 'alt');
+          renderInst();
+          return;
+        }
+        el.classList.add('miss'); stEl.textContent = 'not here';
+        log(`${c.name}: no provider for ${token}. Ask the parent.`);
+      }
+    });
+    $$('#st-di ~ .controls [data-token]').forEach(b => b.addEventListener('click', () => request(b.dataset.token)));
+  }
+
+  /* ===== 5. Routing ===== */
+  {
+    const st = $('#st-route'), log = logger('log-route');
+    const routes = [
+      { path: '', comp: 'HomeComponent' },
+      { path: 'products', comp: 'ProductListComponent' },
+      { path: 'products/:id', comp: 'ProductDetailComponent' },
+      { path: 'admin', comp: 'AdminComponent', guard: true },
+      { path: 'login', comp: 'LoginComponent' },
+      { path: '**', comp: 'NotFoundComponent' }
+    ];
+    const table = $('#r-table');
+    routes.forEach((r, i) => table.insertAdjacentHTML('beforeend',
+      `<div class="rt" data-i="${i}">{ path: '${r.path}', component: ${r.comp}${r.guard ? ', <span class="g">canActivate: [authGuard]</span>' : ''} }</div>`));
+    const rows = $$('.rt', table);
+    function match(route, url) {
+      if (route.path === '**') return {};
+      const a = route.path.split('/').filter(Boolean), b = url.split('/').filter(Boolean);
+      if (a.length !== b.length) return null;
+      const params = {};
+      for (let i = 0; i < a.length; i++) {
+        if (a[i].startsWith(':')) params[a[i].slice(1)] = b[i];
+        else if (a[i] !== b[i]) return null;
+      }
+      return params;
+    }
+    const views = {
+      HomeComponent: () => `<h4>Welcome back</h4><p>This is the home page. The URL path is empty.</p>`,
+      ProductListComponent: () => `<h4>Products</h4><ul><li><button class="link" type="button" data-go="products/7">Wireless Mouse</button></li><li><button class="link" type="button" data-go="products/42">Mechanical Keyboard</button></li><li><button class="link" type="button" data-go="products/99">27" Monitor</button></li></ul>`,
+      ProductDetailComponent: p => `<h4>Product #${p.id}</h4><p>The same component shows any product. It reads <code>id = '${p.id}'</code> from ActivatedRoute.</p><p><button class="link" type="button" data-go="products">← back to list</button></p>`,
+      AdminComponent: () => `<h4>Admin dashboard</h4><p>The guard returned true. This code was lazy-loaded the first time you came here.</p>`,
+      LoginComponent: () => `<h4>Please sign in</h4><p>The guard redirected you here. Tick “User is logged in” and try Admin again.</p>`,
+      NotFoundComponent: () => `<h4>404 · Page not found</h4><p>No route matched, so the wildcard <code>'**'</code> caught it.</p>`
+    };
+    function render(comp, params) {
+      const v = $('#r-view');
+      v.innerHTML = `<div class="cname">&lt;${comp.replace(/Component$/, '').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}&gt; · ${comp}</div>` + views[comp](params);
+      if (!RM) v.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 350, easing: 'ease-out' });
+      $('#r-params').textContent = Object.keys(params).length ? `paramMap → ${JSON.stringify(params)}` : '';
+    }
+    const go = locked(async function nav(url, redirected) {
+      $('#r-path').textContent = url;
+      if (!redirected) log(`routerLink sets the URL to /${url}. There is no page reload.`, { reset: true });
+      rows.forEach(r => r.classList.remove('scan', 'miss', 'hit', 'blocked'));
+      for (let i = 0; i < routes.length; i++) {
+        const r = routes[i], row = rows[i];
+        row.classList.add('scan');
+        await sleep(260);
+        row.classList.remove('scan');
+        const p = match(r, url);
+        if (!p) { row.classList.add('miss'); continue; }
+        if (r.guard) {
+          log('Matched admin, but it has canActivate: [authGuard]. Running the guard…');
+          await fly(st, row, $('#r-auth'), 'authGuard()', 'alt');
+          if (!$('#r-auth').checked) {
+            row.classList.add('blocked');
+            log('authGuard returned a UrlTree for /login. Navigation is cancelled and redirected.', { cls: 'err' });
+            await sleep(700);
+            return nav('login', true);
+          }
+          log('authGuard returned true.', { cls: 'good' });
+        }
+        row.classList.add('hit');
+        await fly(st, row, $('#r-view'), r.comp);
+        render(r.comp, p);
+        log(`First match: '${r.path}'. ${r.comp} is rendered in <router-outlet>.`, { cls: 'good' });
+        return;
+      }
+    });
+    st.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+    $('#r-path').textContent = '';
+    rows[0].classList.add('hit');
+    render('HomeComponent', {});
+  }
+
+  /* ===== 6. Observables ===== */
+  {
+    const st = $('#st-obs'), log = logger('log-obs');
+    const src = $('#o-src'), fil = $('#o-fil'), mp = $('#o-map');
+    const DUR = 6400, TIMES = [600, 1500, 2400, 3300, 4200, 5100], DONE = 5800;
+    const x = t => (4 + (t / DUR) * 92).toFixed(2) + '%';
+    let timers = [], raf = 0;
+    const marble = (track, t, label, cls) => {
+      const m = document.createElement('div');
+      m.className = 'marble ' + cls; m.style.left = x(t); m.textContent = label;
+      track.appendChild(m); return m;
+    };
+    const bar = (track, t) => { const b = document.createElement('div'); b.className = 'done-bar'; b.style.left = x(t); track.appendChild(b); };
+    const clear = () => [src, fil, mp].forEach(tr => tr.innerHTML = '');
+    function drawStatic() {
+      clear();
+      TIMES.forEach((t, i) => {
+        const n = i + 1, even = n % 2 === 0;
+        marble(src, t, n, '');
+        marble(fil, t, n, even ? '' : 'out');
+        if (even) marble(mp, t, n * 10, 'wide');
+      });
+      [src, fil, mp].forEach(tr => bar(tr, DONE));
+    }
+    drawStatic();
+    const subBtn = $('#o-sub'), unBtn = $('#o-unsub');
+    function stop() {
+      timers.forEach(clearTimeout); timers = [];
+      cancelAnimationFrame(raf);
+      st.style.setProperty('--now-op', 0);
+      subBtn.disabled = false; unBtn.disabled = true;
+    }
+    subBtn.addEventListener('click', () => {
+      stop(); clear();
+      subBtn.disabled = true; unBtn.disabled = false;
+      log('subscribe() is called, so the source starts producing values.', { reset: true });
+      const t0 = performance.now();
+      st.style.setProperty('--now-op', 1);
+      const tick = now => {
+        const t = Math.min(now - t0, DUR);
+        st.style.setProperty('--now', x(t));
+        if (t < DUR) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+      TIMES.forEach((t, i) => {
+        const n = i + 1, even = n % 2 === 0;
+        at(t, () => marble(src, t, n, 'pop'));
+        at(t + 250, () => {
+          marble(fil, t, n, even ? 'drop' : 'out drop');
+          if (!even) log(`source emits ${n}. filter drops it (odd).`);
+        });
+        if (even) at(t + 500, () => {
+          marble(mp, t, n * 10, 'wide drop');
+          log(`source emits ${n} → filter passes → map gives ${n * 10} → next(${n * 10})`, { cls: 'good' });
+        });
+      });
+      at(DONE, () => { [src, fil, mp].forEach(tr => bar(tr, DONE)); log('source completes, and complete() flows through every operator. Done.'); });
+      at(DUR, stop);
+    });
+    unBtn.addEventListener('click', () => {
+      stop();
+      log('unsubscribe() was called. No more values arrive and the timer behind the stream is cleaned up.', { cls: 'err' });
+    });
+  }
+
+  /* ===== 7. Forms ===== */
+  {
+    const form = $('#f-form');
+    const ctrls = {
+      name: { v: [['required'], ['minlength', 3]] },
+      email: { v: [['required'], ['email']] },
+      password: { v: [['required'], ['minlength', 8], ['noNumber']] },
+      confirm: { v: [['required']] }
+    };
+    const EMAIL = /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    const msgs = {
+      required: () => 'This field is required.',
+      minlength: e => `Needs at least ${e.requiredLength} characters (currently ${e.actualLength}).`,
+      email: () => 'Enter a valid email address.',
+      noNumber: () => 'Include at least one number.',
+      passwordsMismatch: () => 'Passwords do not match.'
+    };
+    Object.keys(ctrls).forEach(k => Object.assign(ctrls[k], { el: $(`[data-c="${k}"]`, form), touched: false, dirty: false }));
+    function validate(k) {
+      const c = ctrls[k], val = c.el.value, errs = {};
+      for (const [name, arg] of c.v) {
+        if (name === 'required' && !val) { errs.required = true; break; }
+        if (name === 'minlength' && val && val.length < arg) errs.minlength = { requiredLength: arg, actualLength: val.length };
+        if (name === 'email' && val && !EMAIL.test(val)) errs.email = true;
+        if (name === 'noNumber' && val && !/\d/.test(val)) errs.noNumber = true;
+      }
+      return Object.keys(errs).length ? errs : null;
+    }
+    const groupErr = () => (ctrls.confirm.el.value && ctrls.password.el.value !== ctrls.confirm.el.value) ? { passwordsMismatch: true } : null;
+    const ins = $('#f-inspect');
+    Object.keys(ctrls).forEach(k => ins.insertAdjacentHTML('beforeend',
+      `<div class="ictl" data-i="${k}"><div class="top"><span>${k}</span><span class="st"></span></div><div class="flags"><span class="flag" data-f="touched"></span><span class="flag" data-f="dirty"></span></div><div class="errs"></div></div>`));
+    ins.insertAdjacentHTML('beforeend', `<div class="ictl form" data-i="__form"><div class="top"><span>form (FormGroup)</span><span class="st"></span></div><div class="errs"></div></div>`);
+    const stEl = (el, s) => { el.textContent = s; el.className = 'st ' + s; };
+    function update() {
+      let allValid = true;
+      for (const k of Object.keys(ctrls)) {
+        const c = ctrls[k], errs = validate(k), box = $(`[data-i="${k}"]`, ins);
+        const status = errs ? 'INVALID' : 'VALID';
+        if (errs) allValid = false;
+        stEl($('.st', box), status);
+        const [ft, fd] = $$('.flag', box);
+        ft.textContent = c.touched ? 'touched' : 'untouched'; ft.classList.toggle('on', c.touched);
+        fd.textContent = c.dirty ? 'dirty' : 'pristine'; fd.classList.toggle('on', c.dirty);
+        const e = $('.errs', box);
+        e.textContent = 'errors: ' + (errs ? JSON.stringify(errs) : 'null');
+        e.classList.toggle('none', !errs);
+        c.el.classList.toggle('ng-invalid', !!errs); c.el.classList.toggle('ng-valid', !errs);
+        c.el.classList.toggle('ng-dirty', c.dirty);
+        const show = !!errs && (c.touched || c.dirty);
+        c.el.classList.toggle('show', show);
+        c.el.setAttribute('aria-invalid', show);
+        const slot = $(`[data-err="${k}"]`, form);
+        const key = errs ? Object.keys(errs)[0] : '';
+        const text = show ? msgs[key](errs[key]) : '';
+        if (slot.dataset.t !== text) { slot.dataset.t = text; slot.innerHTML = text ? `<p class="ferr">${text}</p>` : ''; }
+      }
+      const g = groupErr(), fbox = $('[data-i="__form"]', ins);
+      if (g) allValid = false;
+      stEl($('.st', fbox), allValid ? 'VALID' : 'INVALID');
+      const fe = $('.errs', fbox);
+      fe.textContent = 'errors: ' + (g ? JSON.stringify(g) : 'null') + ' (group validator: passwordsMatch)';
+      fe.classList.toggle('none', !g);
+      const cslot = $('[data-err="confirm"]', form);
+      if (g && !validate('confirm') && (ctrls.confirm.touched || ctrls.confirm.dirty)) {
+        const t = msgs.passwordsMismatch();
+        if (cslot.dataset.t !== t) { cslot.dataset.t = t; cslot.innerHTML = `<p class="ferr">${t}</p>`; }
+        ctrls.confirm.el.classList.add('show');
+      }
+      $('#f-submit').disabled = !allValid;
+      $('#f-submit').title = allValid ? '' : '[disabled]="form.invalid"';
+    }
+    form.addEventListener('input', e => { const k = e.target.dataset.c; if (k) { ctrls[k].dirty = true; $('#f-ok').hidden = true; update(); } });
+    form.addEventListener('focusout', e => { const k = e.target.dataset.c; if (k) { ctrls[k].touched = true; update(); } });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const ok = $('#f-ok');
+      ok.hidden = false;
+      ok.textContent = `ngSubmit fired. form.value = ${JSON.stringify({ name: ctrls.name.el.value, email: ctrls.email.el.value, password: '••••' })}`;
+    });
+    $('#f-reset').addEventListener('click', () => {
+      Object.values(ctrls).forEach(c => { c.el.value = ''; c.touched = c.dirty = false; });
+      $('#f-ok').hidden = true; update();
+    });
+    // Example starting state: a half-filled form so the errors are visible at rest.
+    ctrls.name.el.value = 'As'; ctrls.name.touched = ctrls.name.dirty = true;
+    ctrls.email.el.value = 'asha@'; ctrls.email.dirty = true;
+    update();
+  }
+})();
+</script>
